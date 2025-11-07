@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weekly Work Scheduler</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Weekly Work Scheduler</h1>
+  </header>
+
+  <nav>
+    <button class="tab-btn" data-tab="people">People</button>
+    <button class="tab-btn" data-tab="kitchen">Kitchen Duties</button>
+    <button class="tab-btn" data-tab="work">Work Duties</button>
+    <button id="generate-schedule">Generate Schedule</button>
+  </nav>
+
+  <main>
+    <!-- PEOPLE MANAGEMENT -->
+    <section class="tab" id="people">
+      <h2>People & Availability</h2>
+      <input type="text" id="person-name" placeholder="Enter name">
+      <button id="add-person">Add Person</button>
+      <ul id="people-list"></ul>
+    </section>
+
+    <!-- KITCHEN SCHEDULE -->
+    <section class="tab" id="kitchen">
+      <h2>Kitchen Duties</h2>
+      <button class="add-day" data-type="kitchen">Add Day</button>
+      <div id="kitchen-days"></div>
+    </section>
+
+    <!-- WORK DUTIES SCHEDULE -->
+    <section class="tab" id="work">
+      <h2>Work Duties</h2>
+      <button class="add-day" data-type="work">Add Day</button>
+      <div id="work-days"></div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
