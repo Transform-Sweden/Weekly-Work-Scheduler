@@ -1,0 +1,108 @@
+* {
+  box-sizing: border-box;
+  font-family: Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #f5f5f5;
+}
+
+header {
+  background: #3f51b5;
+  color: white;
+  padding: 1rem;
+  text-align: center;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  justify-content: center;
+  background: #e0e0e0;
+}
+
+nav button {
+  padding: 0.5rem 1rem;
+  border: none;
+  background: #3f51b5;
+  color: white;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+nav button:hover {
+  background: #303f9f;
+}
+
+main {
+  padding: 1rem;
+}
+
+.tab {
+  display: none;
+  margin-top: 1rem;
+}
+
+.tab.active {
+  display: block;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+ul li {
+  margin: 0.5rem 0;
+}
+
+.day {
+  border: 1px solid #ccc;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+  border-radius: 4px;
+  background: white;
+}
+
+.task {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0.25rem 0;
+}
+
+.task input[type="number"] {
+  width: 40px;
+}
+
+button.delete-task, button.delete-day, button.remove-person {
+  margin-left: 0.5rem;
+  background: #e53935;
+  color: white;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button.delete-task:hover, button.delete-day:hover, button.remove-person:hover {
+  background: #b71c1c;
+}
+
+button.add-task {
+  margin-top: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button.add-task:hover {
+  background: #2e7d32;
+}
