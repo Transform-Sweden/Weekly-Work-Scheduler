@@ -1,47 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Weekly Work Scheduler</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weekly Work Scheduler</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <h1>Weekly Work Scheduler</h1>
-  </header>
 
-  <nav>
-    <button class="tab-btn" data-tab="people">People</button>
-    <button class="tab-btn" data-tab="kitchen">Kitchen Duties</button>
-    <button class="tab-btn" data-tab="work">Work Duties</button>
-    <button id="generate-schedule">Generate Schedule</button>
-  </nav>
+<h1>Weekly Work Scheduler</h1>
 
-  <main>
-    <!-- PEOPLE MANAGEMENT -->
-    <section class="tab" id="people">
-      <h2>People & Availability</h2>
-      <input type="text" id="person-name" placeholder="Enter name">
-      <button id="add-person">Add Person</button>
-      <ul id="people-list"></ul>
-    </section>
+<section id="people-section">
+  <h2>People</h2>
+  <input type="text" id="person-name" placeholder="Person Name">
+  <button id="add-person">Add Person</button>
+  <div id="people-list"></div>
+</section>
 
-    <!-- KITCHEN SCHEDULE -->
-    <section class="tab" id="kitchen">
-      <h2>Kitchen Duties</h2>
-      <button class="add-day" data-type="kitchen">Add Day</button>
-      <div id="kitchen-days"></div>
-    </section>
+<section id="tasks-section">
+  <h2>Kitchen Tasks</h2>
+  <button id="add-kitchen-task">Add Kitchen Task</button>
+  <div id="kitchen-tasks"></div>
 
-    <!-- WORK DUTIES SCHEDULE -->
-    <section class="tab" id="work">
-      <h2>Work Duties</h2>
-      <button class="add-day" data-type="work">Add Day</button>
-      <div id="work-days"></div>
-    </section>
-  </main>
+  <h2>Work Tasks</h2>
+  <button id="add-work-task">Add Work Task</button>
+  <div id="work-tasks"></div>
+</section>
 
-  <script src="script.js"></script>
+<section id="skip-days-section">
+  <h2>Skip Days</h2>
+  <h3>Kitchen Skip Days</h3>
+  <div id="kitchen-skip-days"></div>
+  <h3>Work Skip Days</h3>
+  <div id="work-skip-days"></div>
+</section>
+
+<section id="schedule-section">
+  <button id="generate-schedule">Generate Schedule</button>
+  <button id="export-csv">Export CSV</button>
+  <div id="schedule-display"></div>
+</section>
+
+<script src="script.js"></script>
 </body>
 </html>
