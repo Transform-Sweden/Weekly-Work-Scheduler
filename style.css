@@ -1,59 +1,47 @@
 body {
   font-family: Arial, sans-serif;
   margin: 20px;
-  background: #f5f5f5;
+  background-color: #fdfdfd;
+  color: #222;
 }
 
-h1,h2,h3,h4 {
-  color: #333;
+h1, h2, h3, h4 {
+  margin-bottom: 5px;
 }
 
 section {
-  background: #fff;
-  padding: 15px;
-  margin-bottom: 20px;
+  margin-bottom: 30px;
+  padding: 10px;
+  border: 1px solid #ccc;
   border-radius: 5px;
-  box-shadow: 0 0 5px #ccc;
-}
-
-input[type=text] {
-  padding: 5px;
-  margin-right: 5px;
+  background-color: #fff;
 }
 
 button {
+  margin-top: 5px;
+  margin-bottom: 10px;
   padding: 5px 10px;
-  margin: 2px;
   cursor: pointer;
 }
 
-.person-card, .task-card {
-  border: 1px solid #ccc;
-  padding: 5px;
-  margin: 5px 0;
-  border-radius: 3px;
-  background: #fafafa;
-}
-
-.availability-table {
-  border-collapse: collapse;
-  margin-top: 5px;
-}
-
-.availability-table th, .availability-table td {
-  border: 1px solid #aaa;
-  padding: 3px 5px;
-  text-align: center;
+input[type="checkbox"] {
+  margin-right: 5px;
+  margin-left: 5px;
 }
 
 .day-schedule {
-  margin-top: 10px;
-  padding: 5px;
-  border: 1px dashed #aaa;
-  border-radius: 3px;
+  margin-bottom: 20px;
 }
 
-ul {
-  margin: 5px 0 10px 15px;
-  padding: 0;
+.task-name {
+  font-weight: bold;
+}
+
+.unassigned {
+  color: red;
+  font-weight: bold;
+}
+
+.person-select {
+  margin-left: 5px;
 }
