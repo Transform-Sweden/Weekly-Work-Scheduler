@@ -10,34 +10,32 @@
 
 <h1>Weekly Work Scheduler</h1>
 
-<section id="people-section">
-  <h2>People</h2>
-  <input type="text" id="person-name" placeholder="Person Name">
-  <button id="add-person">Add Person</button>
+<section>
+  <h2>People & Availability</h2>
   <div id="people-list"></div>
+  <button id="add-person">Add Person</button>
 </section>
 
-<section id="tasks-section">
+<section>
   <h2>Kitchen Tasks</h2>
+  <div id="kitchen-tasks-list"></div>
   <button id="add-kitchen-task">Add Kitchen Task</button>
-  <div id="kitchen-tasks"></div>
-
-  <h2>Work Tasks</h2>
-  <button id="add-work-task">Add Work Task</button>
-  <div id="work-tasks"></div>
+  <h3>Skip Days</h3>
+  <div id="kitchen-skip-days"></div>
 </section>
 
-<section id="skip-days-section">
-  <h2>Skip Days</h2>
-  <h3>Kitchen Skip Days</h3>
-  <div id="kitchen-skip-days"></div>
-  <h3>Work Skip Days</h3>
+<section>
+  <h2>Housework Tasks</h2>
+  <div id="work-tasks-list"></div>
+  <button id="add-work-task">Add Work Task</button>
+  <h3>Skip Days</h3>
   <div id="work-skip-days"></div>
 </section>
 
-<section id="schedule-section">
+<section>
+  <h2>Schedule</h2>
   <button id="generate-schedule">Generate Schedule</button>
-  <button id="export-csv">Export CSV</button>
+  <button id="clear-schedule">Clear Schedule</button>
   <div id="schedule-display"></div>
 </section>
 
