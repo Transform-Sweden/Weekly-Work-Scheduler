@@ -1,297 +1,234 @@
 const daysOfWeek = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const timesOfDay = ["Morning","Afternoon","Evening"];
 
-let people = JSON.parse(localStorage.getItem('people')) || [];
-let kitchenTasks = JSON.parse(localStorage.getItem('kitchenTasks')) || [];
-let workTasks = JSON.parse(localStorage.getItem('workTasks')) || [];
-let kitchenSkipDays = JSON.parse(localStorage.getItem('kitchenSkipDays')) || {};
-let workSkipDays = JSON.parse(localStorage.getItem('workSkipDays')) || {};
-let lastAssignments = JSON.parse(localStorage.getItem('lastAssignments')) || {};
+let people = JSON.parse(localStorage.getItem("people")) || [];
+let tasks = JSON.parse(localStorage.getItem("tasks")) || [];
 
-const peopleListDiv = document.getElementById('people-list');
-const kitchenTasksDiv = document.getElementById('kitchen-tasks-list');
-const workTasksDiv = document.getElementById('work-tasks-list');
-const scheduleDisplay = document.getElementById('schedule-display');
-const kitchenSkipDiv = document.getElementById('kitchen-skip-days');
-const workSkipDiv = document.getElementById('work-skip-days');
+const peopleListDiv = document.getElementById("peopleList");
+const taskListGrid = document.getElementById("taskListGrid");
+const kitchenContainer = document.getElementById("kitchenSchedulesContainer");
+const houseworkContainer = document.getElementById("houseworkSchedulesContainer");
 
-function saveAll(){
-  localStorage.setItem('people', JSON.stringify(people));
-  localStorage.setItem('kitchenTasks', JSON.stringify(kitchenTasks));
-  localStorage.setItem('workTasks', JSON.stringify(workTasks));
-  localStorage.setItem('kitchenSkipDays', JSON.stringify(kitchenSkipDays));
-  localStorage.setItem('workSkipDays', JSON.stringify(workSkipDays));
-  localStorage.setItem('lastAssignments', JSON.stringify(lastAssignments));
+function saveAll() {
+  localStorage.setItem("people", JSON.stringify(people));
+  localStorage.setItem("tasks", JSON.stringify(tasks));
 }
 
-function renderSkipDays(){
-  kitchenSkipDiv.innerHTML = "";
-  workSkipDiv.innerHTML = "";
-  daysOfWeek.forEach(day => {
-    const kcb = document.createElement('input');
-    kcb.type="checkbox"; kcb.id=`kitchen-skip-${day}`;
-    kcb.checked = kitchenSkipDays[day] || false;
-    kcb.addEventListener('change',()=>{
-      kitchenSkipDays[day]=kcb.checked;
-      saveAll();
-    });
-    const klabel = document.createElement('label');
-    klabel.textContent = day; klabel.appendChild(kcb);
-    kitchenSkipDiv.appendChild(klabel);
-
-    const wcb = document.createElement('input');
-    wcb.type="checkbox"; wcb.id=`work-skip-${day}`;
-    wcb.checked = workSkipDays[day] || false;
-    wcb.addEventListener('change',()=>{
-      workSkipDays[day]=wcb.checked;
-      saveAll();
-    });
-    const wlabel = document.createElement('label');
-    wlabel.textContent = day; wlabel.appendChild(wcb);
-    workSkipDiv.appendChild(wlabel);
-
-    kitchenSkipDays[day] = kitchenSkipDays[day] || false;
-    workSkipDays[day] = workSkipDays[day] || false;
-  });
+// -------- People --------
+function addPerson() {
+  const name = document.getElementById("personName").value.trim();
+  if (!name) return alert("Enter a name");
+  people.push({name, unavailable:{}});
+  saveAll();
+  renderPeople();
 }
-renderSkipDays();
+
+function removePerson(i) {
+  people.splice(i,1);
+  saveAll();
+  renderPeople();
+}
 
 function renderPeople() {
   peopleListDiv.innerHTML = "";
-  people.forEach((p, i) => {
-    const div = document.createElement('div');
-    div.innerHTML = `<strong>${p.name}</strong> 
-      <button onclick="removePerson(${i})">Remove</button>`;
-    daysOfWeek.forEach(day => {
-      const dayDiv = document.createElement('div');
-      dayDiv.innerHTML = `<em>${day}:</em> `;
-      timesOfDay.forEach(time => {
-        const cb = document.createElement('input');
-        cb.type="checkbox";
-        if(!p.unavailable) p.unavailable={};
+  people.forEach((p,i)=>{
+    const container = document.createElement("div");
+    container.style.marginBottom = "20px";
+    const header = document.createElement("div");
+    header.innerHTML = `<strong>${p.name}</strong> <button onclick="removePerson(${i})">Remove</button>`;
+    container.appendChild(header);
+
+    const table = document.createElement("table");
+    table.className = "availability-grid";
+
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    headerRow.innerHTML = `<th>Time</th>` + daysOfWeek.map(d=>`<th>${d}</th>`).join("");
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    timesOfDay.forEach(time=>{
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>${time}</td>`;
+      daysOfWeek.forEach(day=>{
         if(!p.unavailable[day]) p.unavailable[day]={};
+        const cell = document.createElement("td");
+        const cb = document.createElement("input");
+        cb.type="checkbox";
         cb.checked = p.unavailable[day][time] || false;
-        cb.addEventListener('change', ()=>{
-          p.unavailable[day][time] = cb.checked;
-          saveAll();
-        });
-        const label = document.createElement('label');
-        label.textContent = time;
-        label.appendChild(cb);
-        dayDiv.appendChild(label);
+        cb.addEventListener("change", ()=>{p.unavailable[day][time]=cb.checked; saveAll();});
+        cell.appendChild(cb);
+        row.appendChild(cell);
       });
-      div.appendChild(dayDiv);
+      tbody.appendChild(row);
     });
-    peopleListDiv.appendChild(div);
+    table.appendChild(tbody);
+    container.appendChild(table);
+
+    peopleListDiv.appendChild(container);
   });
 }
 
-document.getElementById('add-person').addEventListener('click', () => {
-  const name = prompt("Enter person's name:");
-  if (!name) return;
-  const person = {name, unavailable:{}};
-  people.push(person);
+// -------- Tasks --------
+function addTask() {
+  const name = document.getElementById("taskName").value.trim();
+  const type = document.getElementById("taskType").value;
+  const peopleNeeded = parseInt(document.getElementById("taskPeople").value);
+  let timeCheckboxes = document.querySelectorAll("#taskTimes input[type=checkbox]");
+  let times = Array.from(timeCheckboxes).filter(cb=>cb.checked).map(cb=>cb.value);
+  if(type==="housework") times = ["Afternoon"];
+  if(!name || times.length===0) return alert("Enter task name and times");
+  
+  // Assign initially to all days
+  tasks.push({name,type,peopleNeeded,times,days:[...daysOfWeek]});
   saveAll();
-  renderPeople();
-});
-
-function removePerson(index) {
-  people.splice(index,1);
-  saveAll();
-  renderPeople();
+  renderTasks();
 }
 
-function renderKitchenTasks() {
-  kitchenTasksDiv.innerHTML="";
-  kitchenTasks.forEach((t,i)=>{
-    const div = document.createElement('div');
-    div.innerHTML = `${t.name} — ${t.people} person(s) 
-      <button onclick="removeKitchenTask(${i})">Remove</button>`;
-    kitchenTasksDiv.appendChild(div);
-  });
+function removeTask(i){
+  tasks.splice(i,1);
+  saveAll();
+  renderTasks();
 }
 
-document.getElementById('add-kitchen-task').addEventListener('click', () => {
-  const name = prompt("Enter task name (Breakfast/Lunch/Dinner):");
-  const peopleNum = parseInt(prompt("Number of people for task:"),10)||1;
-  if (!name) return;
-  kitchenTasks.push({name, people: peopleNum});
-  saveAll();
-  renderKitchenTasks();
-});
-
-function removeKitchenTask(i){
-  kitchenTasks.splice(i,1);
-  saveAll();
-  renderKitchenTasks();
-}
-
-function renderWorkTasks() {
-  workTasksDiv.innerHTML="";
-  workTasks.forEach((t,i)=>{
-    const div = document.createElement('div');
-    div.innerHTML = `${t.name} — ${t.people} person(s) — ${t.time} 
-      <button onclick="removeWorkTask(${i})">Remove</button>`;
-    workTasksDiv.appendChild(div);
-  });
-}
-
-document.getElementById('add-work-task').addEventListener('click', () => {
-  const name = prompt("Enter housework task name:");
-  const peopleNum = parseInt(prompt("Number of people for task:"),10)||1;
-  const time = prompt("Preferred time: Morning, Afternoon, Evening, Any") || "Any";
-  if (!name) return;
-  workTasks.push({name, people: peopleNum, time});
-  saveAll();
-  renderWorkTasks();
-});
-
-function removeWorkTask(i){
-  workTasks.splice(i,1);
-  saveAll();
-  renderWorkTasks();
-}
-
-document.getElementById('generate-schedule').addEventListener('click', () => {
-  if(people.length===0){ alert("Add people first!"); return; }
-
-  const assignmentCount = {};
-  people.forEach(p => assignmentCount[p.name]=0);
-
-  const assignments = {};
-  people.forEach(p=>{
-    assignments[p.name]={};
-    daysOfWeek.forEach(d=>{
-      assignments[p.name][d]={};
-      timesOfDay.forEach(t=> assignments[p.name][d][t]=[]);
-    });
-  });
-
-  function pickAvailablePerson(available) {
-    if (available.length === 0) return null;
-    available.sort((a,b) => assignmentCount[a.name] - assignmentCount[b.name]);
-    const chosen = available[0];
-    assignmentCount[chosen.name]++;
-    return chosen;
-  }
-
+// -------- Drag & Drop --------
+function renderTasks(){
+  taskListGrid.innerHTML="";
   daysOfWeek.forEach(day=>{
-    timesOfDay.forEach(time=>{
-      
-      if (!kitchenSkipDays[day]) {
-        kitchenTasks.forEach(t=>{
-          if ((time==="Morning" && t.name.includes("Breakfast")) ||
-              (time==="Afternoon" && t.name.includes("Lunch")) ||
-              (time==="Evening" && t.name.includes("Dinner"))) {
+    const dayCol = document.createElement("div");
+    dayCol.className="day-column";
+    dayCol.dataset.day=day;
+    const h4 = document.createElement("h4");
+    h4.innerText=day;
+    dayCol.appendChild(h4);
 
-            for(let i=0;i<t.people;i++){
-              const available = people.filter(p=>!p.unavailable[day]?.[time]);
-              const person = pickAvailablePerson(available);
-              if(person){
-                assignments[person.name][day][time].push(t.name);
-              } else {
-                assignments["Unassigned"] = assignments["Unassigned"] || {};
-                assignments["Unassigned"][day] = assignments["Unassigned"][day] || {};
-                assignments["Unassigned"][day][time] = assignments["Unassigned"][day][time] || [];
-                assignments["Unassigned"][day][time].push(t.name);
-              }
-            }
-          }
-        });
-      }
+    tasks.filter(t=>t.days.includes(day)).forEach((t,i)=>{
+      const div = document.createElement("div");
+      div.className="task-item";
+      div.draggable=true;
+      div.innerText=`${t.name} (${t.type}, ${t.peopleNeeded})`;
+      div.dataset.index = tasks.indexOf(t);
 
-      if (!workSkipDays[day]) {
-        workTasks.forEach(t=>{
-          if ((time===t.time) || t.time==="Any") {
-            for(let i=0;i<t.people;i++){
-              const available = people.filter(p=>!p.unavailable[day]?.[time]);
-              const person = pickAvailablePerson(available);
-              if(person){
-                assignments[person.name][day][time].push(t.name);
-              } else {
-                assignments["Unassigned"] = assignments["Unassigned"] || {};
-                assignments["Unassigned"][day] = assignments["Unassigned"][day] || {};
-                assignments["Unassigned"][day][time] = assignments["Unassigned"][day][time] || [];
-                assignments["Unassigned"][day][time].push(t.name);
-              }
-            }
-          }
-        });
-      }
-
-    });
-  });
-
-  lastAssignments = assignments;
-  saveAll();
-
-  displaySchedule(assignments);
-});
-
-function displaySchedule(assignments){
-  let html="";
-  daysOfWeek.forEach(day=>{
-    const dayHasTasks = people.some(p=>timesOfDay.some(time=>assignments[p.name][day][time].length>0));
-    if(!dayHasTasks) return;
-    html+=`<div class="day-schedule"><h3>${day}</h3>`;
-    timesOfDay.forEach(time=>{
-      html+=`<h4>${time}</h4><ul>`;
-      people.forEach(p=>{
-        const tasks = assignments[p.name][day][time];
-        if(tasks.length===0){
-          html+=`<li style="color: gray;">${p.name} — unavailable</li>`;
-        } else {
-          tasks.forEach((t, idx)=>{
-            html+=`<li>
-              <span class="task-name">${t}</span> — 
-              <select class="person-select" data-day="${day}" data-time="${time}" data-task="${t}" data-idx="${idx}">
-                ${people.map(pp=>`<option value="${pp.name}" ${pp.name===p.name?"selected":""}>${pp.name}</option>`).join('')}
-              </select>
-            </li>`;
-          });
-        }
+      div.addEventListener("dragstart", e=>{
+        e.dataTransfer.setData("text/plain", tasks.indexOf(t));
+        setTimeout(()=>div.classList.add("dragging"),0);
       });
-      if(assignments["Unassigned"] && assignments["Unassigned"][day] && assignments["Unassigned"][day][time]){
-        assignments["Unassigned"][day][time].forEach(t=>{
-          html+=`<li class="unassigned">${t} — Unassigned</li>`;
-        });
-      }
-      html+="</ul>";
+      div.addEventListener("dragend", e=>{
+        div.classList.remove("dragging");
+      });
+
+      dayCol.appendChild(div);
     });
-    html+="</div>";
-  });
-  scheduleDisplay.innerHTML=html;
 
-  document.querySelectorAll(".person-select").forEach(select=>{
-    select.addEventListener("change", e=>{
-      const day = e.target.dataset.day;
-      const time = e.target.dataset.time;
-      const task = e.target.dataset.task;
-      const idx = parseInt(e.target.dataset.idx);
-
-      const oldPerson = Object.keys(assignments).find(name=>assignments[name][day][time].includes(task));
-      if(oldPerson){
-        assignments[oldPerson][day][time].splice(assignments[oldPerson][day][time].indexOf(task),1);
-      }
-      const newPerson = e.target.value;
-      assignments[newPerson][day][time].push(task);
-      lastAssignments = assignments;
+    dayCol.addEventListener("dragover", e=>e.preventDefault());
+    dayCol.addEventListener("drop", e=>{
+      const index = parseInt(e.dataTransfer.getData("text/plain"));
+      const task = tasks[index];
+      if(!task.days.includes(day)) task.days.push(day);
+      // Optionally remove from other days if you want one day per task:
+      // task.days = [day];
       saveAll();
+      renderTasks();
     });
+
+    taskListGrid.appendChild(dayCol);
   });
 }
 
-document.getElementById('clear-schedule').addEventListener('click', ()=>{
-  scheduleDisplay.innerHTML="";
-  lastAssignments = {};
-  saveAll();
-});
+// -------- Generate Schedule --------
+function generateSchedules() {
+  const kitchenGrid = createScheduleGrid(tasks.filter(t=>t.type==="kitchen"));
+  const houseworkGrid = createScheduleGrid(tasks.filter(t=>t.type==="housework"));
 
-window.addEventListener('load', ()=>{
-  renderPeople();
-  renderKitchenTasks();
-  renderWorkTasks();
-  if(Object.keys(lastAssignments).length>0){
-    displaySchedule(lastAssignments);
-  }
-});
+  appendSchedule(kitchenContainer, kitchenGrid, 'Kitchen');
+  appendSchedule(houseworkContainer, houseworkGrid, 'Housework');
+}
+
+function appendSchedule(container, htmlGrid, title){
+  const wrapper = document.createElement("div");
+  wrapper.className = "schedule-wrapper";
+  wrapper.innerHTML = `<button class="delete-schedule" onclick="wrapper.remove()">Delete</button>${htmlGrid}`;
+  container.appendChild(wrapper);
+}
+
+function createScheduleGrid(taskArray){
+  let taskCount = {};
+  people.forEach(p=> taskCount[p.name] = 0);
+
+  const grid = document.createElement("table");
+  grid.className="schedule-grid";
+
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  headerRow.innerHTML = "<th>Task / Day</th>" + daysOfWeek.map(d=>`<th>${d}</th>`).join("");
+  thead.appendChild(headerRow);
+  grid.appendChild(thead);
+
+  taskArray.forEach(task=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${task.name}</td>`;
+
+    daysOfWeek.forEach(day=>{
+      const td=document.createElement("td");
+      if(task.days.includes(day)){
+        let assignedPeople = [];
+        task.times.forEach(t=>{
+          const available = people.filter(p=> !p.unavailable[day][t]);
+          available.sort((a,b)=> taskCount[a.name]-taskCount[b.name]);
+          for(let i=0;i<task.peopleNeeded;i++){
+            if(i>=available.length) break;
+            assignedPeople.push(available[i].name);
+            taskCount[available[i].name]++;
+          }
+        });
+        td.innerText = assignedPeople.join(", ") || "-";
+      } else td.innerText="-";
+      tr.appendChild(td);
+    });
+
+    grid.appendChild(tr);
+  });
+
+  return grid.outerHTML;
+}
+
+// -------- Download CSV --------
+function downloadCSV(type){
+  let taskArray = tasks.filter(t=>t.type===type);
+  if(taskArray.length===0) return alert("No tasks of this type");
+
+  let taskCount = {};
+  people.forEach(p=> taskCount[p.name] = 0);
+
+  let csv="Task,"+daysOfWeek.join(",")+"\n";
+  taskArray.forEach(task=>{
+    csv+=task.name+",";
+    csv+=daysOfWeek.map(day=>{
+      if(task.days.includes(day)){
+        let assignedPeople=[];
+        task.times.forEach(t=>{
+          const available = people.filter(p=>!p.unavailable[day][t]);
+          available.sort((a,b)=> taskCount[a.name]-taskCount[b.name]);
+          for(let i=0;i<task.peopleNeeded;i++){
+            if(i>=available.length) break;
+            assignedPeople.push(available[i].name);
+            taskCount[available[i].name]++;
+          }
+        });
+        return assignedPeople.join(" & ") || "-";
+      } else return "-";
+    }).join(",")+"\n";
+  });
+
+  const blob = new Blob([csv], {type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download=type+"_schedule.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+renderPeople();
+renderTasks();
