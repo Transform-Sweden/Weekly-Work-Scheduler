@@ -163,18 +163,25 @@ function renderTasks(taskArray, tableBody){
 addKitchenTaskBtn.addEventListener("click",()=>{
     const name=kitchenTaskInput.value.trim(); const count=parseInt(kitchenTaskCount.value)||1;
     if(!name) return alert("Task name required");
-    const taskObj={name,count,days:{}}; days.forEach(d=>taskObj.days[d]=true);
+    const taskObj={name,count,days:{}}; days.forEach(d=>taskObj.days[d]=true); // kitchen tasks stay pre-checked
     kitchenTasks.push(taskObj); renderTasks(kitchenTasks,kitchenTaskTable); kitchenTaskInput.value=""; kitchenTaskCount.value=1; saveData();
 });
 
-addWorkTaskBtn.addEventListener("click",()=>{
-    const name=workTaskInput.value.trim(); const count=parseInt(workTaskCount.value)||1;
+addWorkTaskBtn.addEventListener("click", () => {
+    const name = workTaskInput.value.trim();
+    const count = parseInt(workTaskCount.value) || 1;
     const genderReq = workTaskGender.value;
-    if(!name) return alert("Task name required");
-    const taskObj={name,count,days:{}, genderRequired: genderReq};
-    days.forEach(d=>taskObj.days[d]=true);
-    workTasks.push(taskObj); renderTasks(workTasks,workTaskTable);
-    workTaskInput.value=""; workTaskCount.value=1; workTaskGender.value="Any"; saveData();
+    if (!name) return alert("Task name required");
+
+    const taskObj = { name, count, days: {}, genderRequired: genderReq };
+    days.forEach(d => taskObj.days[d] = false); // <-- initialize as unchecked
+    workTasks.push(taskObj);
+    renderTasks(workTasks, workTaskTable);
+
+    workTaskInput.value = "";
+    workTaskCount.value = 1;
+    workTaskGender.value = "Any";
+    saveData();
 });
 
 // ====== Schedule Generation ======
