@@ -157,7 +157,7 @@ function renderTasks(taskArray, tableBody){
     });
 }
 
-// Add Kitchen Task
+// ====== Add Task Buttons ======
 addKitchenTaskBtn.addEventListener("click",()=>{
     const name=kitchenTaskInput.value.trim(); 
     const count=parseInt(kitchenTaskCount.value)||1;
@@ -171,7 +171,6 @@ addKitchenTaskBtn.addEventListener("click",()=>{
     saveData();
 });
 
-// Add Work Task
 addWorkTaskBtn.addEventListener("click", () => {
     const name = workTaskInput.value.trim();
     const count = parseInt(workTaskCount.value) || 1;
@@ -189,7 +188,7 @@ addWorkTaskBtn.addEventListener("click", () => {
     saveData();
 });
 
-// ====== Schedule Generation ======
+// ====== Generate & Clear ======
 generateBtn.addEventListener("click",()=>generateSchedule());
 clearBtn.addEventListener("click",()=>{ kitchenScheduleTable.innerHTML=""; workScheduleTable.innerHTML=""; });
 
@@ -223,7 +222,7 @@ downloadBtn.addEventListener("click", ()=>{
     URL.revokeObjectURL(url);
 });
 
-// ====== Schedule Generation Function ======
+// ====== Generate Schedule ======
 function generateSchedule() {
     // Remove deleted people from availability
     Object.keys(availability).forEach(name => {
@@ -231,7 +230,6 @@ function generateSchedule() {
     });
     saveData();
 
-    // Clear tables
     kitchenScheduleTable.innerHTML = "";
     workScheduleTable.innerHTML = "";
 
@@ -243,7 +241,7 @@ function generateSchedule() {
 
     const kBody = kitchenScheduleTable.createTBody();
     const kDayRows = {};
-    const firstPersonCellIdx = 2;
+    const firstPersonCellIdx = 2; // 0 = day, 1 = task label
 
     days.forEach(day => {
         kitchenSubTasks.forEach((sub, idx) => {
@@ -253,8 +251,7 @@ function generateSchedule() {
                 dayTd.textContent = day;
                 dayTd.rowSpan = kitchenSubTasks.length;
             } else row.insertCell();
-
-            row.insertCell().textContent = sub;
+            row.insertCell().textContent = sub; // task label
             peopleList.forEach(() => row.insertCell());
             kDayRows[`${day}-${sub}`] = row;
         });
@@ -303,4 +300,22 @@ function generateSchedule() {
         days.forEach(day => {
             if (task.days[day]) {
                 const available = peopleList.filter(p =>
-                   
+                    availability[p.name][day]["Lunch Dishes"] &&
+                    (task.genderRequired === "Any" || p.gender === task.genderRequired)
+                );
+                if (!available.length) return;
+                if (!dayTaskCount[day]) dayTaskCount[day] = {};
+                available.forEach(p => { if (dayTaskCount[day][p.name] == null) dayTaskCount[day][p.name] = 0; });
+                for (let i = 0; i < task.count; i++) {
+                    available.sort((a, b) => dayTaskCount[day][a.name] - dayTaskCount[day][b.name]);
+                    const p = available[0];
+                    const cellIdx = 1 + peopleList.findIndex(pl => pl.name === p.name); // first person column
+                    const cell = wDayRows[day].cells[cellIdx];
+                    cell.textContent += (cell.textContent ? ", " : "") + task.name;
+                    cell.className = "work-task";
+                    dayTaskCount[day][p.name]++;
+                }
+            }
+        });
+    });
+}
