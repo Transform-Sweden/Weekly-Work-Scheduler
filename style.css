@@ -1,59 +1,48 @@
 body {
     font-family: Arial, sans-serif;
-    background-color: #f5f5f5;
-    margin: 0;
-    padding: 0;
+    margin: 20px;
+    background-color: #f4f4f4;
 }
 
-.container {
-    max-width: 1000px;
-    margin: 20px auto;
-    padding: 20px;
-    background-color: #fff;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
-}
-
-.title {
+h1, h2 {
     text-align: left;
-    margin-bottom: 20px;
 }
 
-.section-title {
-    text-align: left;
-    margin-top: 30px;
-    margin-bottom: 10px;
-    font-size: 1.2em;
-}
-
-button {
+input, button {
     margin: 5px 0;
-    padding: 5px 10px;
 }
 
-input[type="text"] {
-    padding: 5px;
-    margin-right: 5px;
-}
-
-#peopleList, #kitchenTasksList, #workTasksList {
-    margin-top: 10px;
+section {
+    background: white;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 5px;
 }
 
 table {
+    width: 100%;
     border-collapse: collapse;
-    margin: 10px auto; /* tables centered */
+    margin-top: 10px;
 }
 
-td, th {
-    border: 1px solid #ccc;
-    padding: 5px 10px;
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
     text-align: center;
 }
 
-.checkbox-cell {
-    width: 30px;
+th {
+    background-color: #f2f2f2;
 }
 
-#scheduleDisplay {
-    margin-top: 20px;
+button {
+    cursor: pointer;
+}
+
+.remove-btn {
+    background-color: red;
+    color: white;
+    border: none;
+    padding: 3px 6px;
+    border-radius: 3px;
 }
