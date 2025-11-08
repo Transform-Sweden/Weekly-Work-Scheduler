@@ -181,6 +181,36 @@ addWorkTaskBtn.addEventListener("click",()=>{
 generateBtn.addEventListener("click",()=>generateSchedule());
 clearBtn.addEventListener("click",()=>{ kitchenScheduleTable.innerHTML=""; workScheduleTable.innerHTML=""; });
 
+// ====== Dark Mode ======
+darkmodeBtn.addEventListener("click", ()=>{
+    document.body.classList.toggle("dark");
+});
+
+// ====== CSV Download ======
+downloadBtn.addEventListener("click", ()=>{
+    function tableToCSV(table){
+        let csv=[];
+        for(let row of table.rows){
+            let rowData=[];
+            for(let cell of row.cells){
+                rowData.push('"' + cell.textContent.replace(/"/g,'""') + '"');
+            }
+            csv.push(rowData.join(","));
+        }
+        return csv.join("\n");
+    }
+
+    const kitchenCSV = tableToCSV(kitchenScheduleTable);
+    const workCSV = tableToCSV(workScheduleTable);
+    const blob = new Blob([kitchenCSV + "\n\n" + workCSV], {type: "text/csv"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "schedule.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+});
+
 // ====== Balanced Task Assignment with Day Row Grouping ======
 function generateSchedule(){
     kitchenScheduleTable.innerHTML=""; workScheduleTable.innerHTML="";
@@ -254,3 +284,9 @@ function generateSchedule(){
         });
     });
 }
+
+// ====== Initial Render ======
+renderPeople();
+renderAvailability();
+renderTasks(kitchenTasks, kitchenTaskTable);
+renderTasks(workTasks, workTaskTable);
