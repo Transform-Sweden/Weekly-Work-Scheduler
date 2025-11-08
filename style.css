@@ -1,0 +1,93 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background-color: #f4f4f4;
+}
+
+h1, h2 {
+    text-align: left;
+}
+
+input, button, select {
+    margin: 5px 0;
+}
+
+section {
+    background: white;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+}
+
+th {
+    background-color: #f2f2f2;
+}
+
+button {
+    cursor: pointer;
+}
+
+.remove-btn {
+    background-color: red;
+    color: white;
+    border: none;
+    padding: 3px 6px;
+    border-radius: 3px;
+}
+
+.task-label {
+    margin-right: 5px;
+}
+
+/* Schedule Table Styles */
+.kitchen-task {
+    background-color: #d1e7dd;
+}
+
+.work-task {
+    background-color: #cfe2ff;
+}
+
+/* Alternate day colors for readability */
+.kitchen-schedule-table tbody tr:nth-child(5n+1),
+.work-schedule-table tbody tr:nth-child(7n+1) {
+    background-color: #e9ecef;
+}
+
+/* Dark Mode */
+body.dark {
+    background-color: #121212;
+    color: #eee;
+}
+
+body.dark section {
+    background-color: #1e1e1e;
+}
+
+body.dark th {
+    background-color: #333;
+}
+
+body.dark td {
+    border-color: #444;
+}
+
+body.dark .kitchen-task {
+    background-color: #2e4d3d;
+}
+
+body.dark .work-task {
+    background-color: #2d3d66;
+}
