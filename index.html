@@ -1,77 +1,203 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Weekly Work Scheduler</title>
-<link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <title>Weekly Work Scheduler</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* ====== CSS Embedded ====== */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px auto;
+            max-width: 1200px;
+            padding: 0 10px;
+            background-color: #f4f4f4;
+        }
+
+        h1, h2 {
+            text-align: left;
+        }
+
+        input, button {
+            margin: 5px 0;
+        }
+
+        section {
+            background: white;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .input-group {
+            margin-bottom: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            display: block;
+            overflow-x: auto;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+            min-width: 50px;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        tbody tr:hover {
+            background-color: #e6f7ff;
+        }
+
+        button {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: none;
+            background-color: #007BFF;
+            color: white;
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .remove-btn {
+            background-color: red;
+            color: white;
+            border: none;
+            padding: 3px 6px;
+            border-radius: 3px;
+        }
+
+        .remove-btn:hover {
+            background-color: darkred;
+        }
+
+        .task-label {
+            margin-right: 5px;
+        }
+
+        .schedule-table td.kitchen-task {
+            background-color: #d1e7dd; /* light green */
+        }
+
+        .schedule-table td.work-task {
+            background-color: #f8d7da; /* light red */
+        }
+
+        @media (max-width: 768px) {
+            table {
+                display: block;
+                overflow-x: auto;
+            }
+        }
+    </style>
 </head>
 <body>
-<div class="container">
-  <h1>Weekly Work Scheduler</h1>
+    <h1>Weekly Work Scheduler</h1>
 
-  <section id="people-section">
-    <h2>People</h2>
-    <input type="text" id="person-name" placeholder="Name">
-    <button onclick="addPerson()">Add Person</button>
-    <ul id="people-list"></ul>
-  </section>
+    <!-- People Section -->
+    <section id="people-section">
+        <h2>People</h2>
+        <div class="input-group">
+            <input type="text" id="person-name" placeholder="Enter name">
+            <button id="add-person-btn">Add Person</button>
+        </div>
+        <ul id="people-list"></ul>
+    </section>
 
-  <section id="tasks-section">
-    <h2>Tasks</h2>
-    <div class="task-group">
-      <h3>Kitchen Tasks</h3>
-      <input type="text" id="kitchen-task-name" placeholder="Task name">
-      <input type="number" id="kitchen-task-amount" placeholder="People needed" min="1" value="1">
-      <button onclick="addKitchenTask()">Add Task</button>
-      <ul id="kitchen-task-list"></ul>
+    <!-- Kitchen Tasks Section -->
+    <section id="kitchen-section">
+        <h2>Kitchen Tasks</h2>
+        <div class="input-group">
+            <input type="text" id="kitchen-task-name" placeholder="Enter task">
+            <input type="number" id="kitchen-task-count" placeholder="People needed" min="1" value="1">
+            <button id="add-kitchen-task-btn">Add Task</button>
+        </div>
+        <table id="kitchen-task-table">
+            <thead>
+                <tr>
+                    <th>Task</th>
+                    <th>People Needed</th>
+                    <th>Days Needed</th>
+                    <th>Remove</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </section>
+
+    <!-- Work Tasks Section -->
+    <section id="work-section">
+        <h2>Work Duties</h2>
+        <div class="input-group">
+            <input type="text" id="work-task-name" placeholder="Enter task">
+            <input type="number" id="work-task-count" placeholder="People needed" min="1" value="1">
+            <button id="add-work-task-btn">Add Task</button>
+        </div>
+        <table id="work-task-table">
+            <thead>
+                <tr>
+                    <th>Task</th>
+                    <th>People Needed</th>
+                    <th>Days Needed</th>
+                    <th>Remove</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </section>
+
+    <!-- Availability Section -->
+    <section id="availability-section">
+        <h2>Availability</h2>
+        <table id="availability-table">
+            <thead>
+                <tr>
+                    <th>Person</th>
+                    <th>Mon</th>
+                    <th>Tue</th>
+                    <th>Wed</th>
+                    <th>Thu</th>
+                    <th>Fri</th>
+                    <th>Sat</th>
+                    <th>Sun</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </section>
+
+    <!-- Schedule Buttons -->
+    <div class="input-group">
+        <button id="generate-btn">Generate Schedule</button>
+        <button id="clear-btn">Clear Schedule</button>
     </div>
-    <div class="task-group">
-      <h3>Work Duties</h3>
-      <input type="text" id="work-task-name" placeholder="Task name">
-      <input type="number" id="work-task-amount" placeholder="People needed" min="1" value="1">
-      <button onclick="addWorkTask()">Add Task</button>
-      <ul id="work-task-list"></ul>
-    </div>
-  </section>
 
-  <section id="availability-section">
-    <h2>Availability</h2>
-    <table id="availability-table">
-      <thead>
-        <tr>
-          <th>Person</th>
-          <th>Day</th>
-          <th>Breakfast</th>
-          <th>Lunch</th>
-          <th>Lunch Dishes</th>
-          <th>Dinner</th>
-          <th>Dinner Dishes</th>
-          <th>Work Duties</th>
-        </tr>
-      </thead>
-      <tbody>
-        <!-- Dynamically populated -->
-      </tbody>
-    </table>
-  </section>
+    <!-- Schedule Section -->
+    <section id="schedule-section">
+        <h2>Generated Kitchen Schedule</h2>
+        <table id="kitchen-schedule-table" class="schedule-table"></table>
 
-  <section id="schedule-section">
-    <h2>Generated Schedules</h2>
-    <button onclick="generateSchedule()">Generate Schedule</button>
-    <button onclick="clearSchedule()">Clear Schedule</button>
-    <div id="schedules">
-      <div id="kitchen-schedule">
-        <h3>Kitchen Schedule</h3>
-        <div id="kitchen-grid"></div>
-      </div>
-      <div id="work-schedule">
-        <h3>Work Duties Schedule</h3>
-        <div id="work-grid"></div>
-      </div>
-    </div>
-  </section>
-</div>
-<script src="script.js"></script>
+        <h2>Generated Work Duties Schedule</h2>
+        <table id="work-schedule-table" class="schedule-table"></table>
+    </section>
+
+    <script src="script.js"></script>
 </body>
 </html>
