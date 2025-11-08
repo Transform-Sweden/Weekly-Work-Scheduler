@@ -1,55 +1,54 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Weekly Work Scheduler</title>
-  <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekly Work Scheduler</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Weekly Work Scheduler</h1>
+    <div class="container">
+        <h1 class="title">Weekly Work Scheduler</h1>
 
-  <!-- People & Availability -->
-  <section id="peopleSection">
-    <h2>People & Availability</h2>
-    <input type="text" id="personName" placeholder="Name" />
-    <button onclick="addPerson()">Add Person</button>
-    <div id="peopleList"></div>
-  </section>
+        <!-- People Management -->
+        <section>
+            <h2 class="section-title">People & Availability</h2>
+            <input type="text" id="personName" placeholder="Enter name">
+            <button id="addPersonBtn">Add Person</button>
+            <div id="peopleList"></div>
+        </section>
 
-  <!-- Tasks -->
-  <section id="taskSection">
-    <h2>Tasks</h2>
-    <input type="text" id="taskName" placeholder="Task Name" />
-    <select id="taskType">
-      <option value="kitchen">Kitchen</option>
-      <option value="housework">Housework</option>
-    </select>
-    <input type="number" id="taskPeople" min="1" value="1" placeholder="People Needed" />
-    <div id="taskDays">
-      <label><input type="checkbox" value="Monday"> Mon</label>
-      <label><input type="checkbox" value="Tuesday"> Tue</label>
-      <label><input type="checkbox" value="Wednesday"> Wed</label>
-      <label><input type="checkbox" value="Thursday"> Thu</label>
-      <label><input type="checkbox" value="Friday"> Fri</label>
-      <label><input type="checkbox" value="Saturday"> Sat</label>
-      <label><input type="checkbox" value="Sunday"> Sun</label>
+        <!-- Kitchen Tasks -->
+        <section>
+            <h2 class="section-title">Kitchen Tasks</h2>
+            <button id="addKitchenTaskBtn">Add Kitchen Task</button>
+            <div id="kitchenTasksList"></div>
+        </section>
+
+        <!-- Housework Tasks -->
+        <section>
+            <h2 class="section-title">Housework Tasks</h2>
+            <button id="addWorkTaskBtn">Add Work Task</button>
+            <div id="workTasksList"></div>
+        </section>
+
+        <!-- Schedule Generation -->
+        <section>
+            <h2 class="section-title">Generate Schedule</h2>
+            <button id="generateScheduleBtn">Generate Schedule</button>
+            <button id="clearScheduleBtn">Clear Schedule</button>
+        </section>
+
+        <!-- Generated Schedule Display -->
+        <section id="scheduleDisplay">
+            <h2 class="section-title">Generated Kitchen Schedule</h2>
+            <div id="kitchenSchedule"></div>
+
+            <h2 class="section-title">Generated Housework Schedule</h2>
+            <div id="workSchedule"></div>
+        </section>
     </div>
-    <button onclick="addTask()">Add Task</button>
-    <div id="taskList"></div>
-  </section>
 
-  <!-- Generate Schedules -->
-  <section>
-    <h2>Generate Schedule</h2>
-    <button onclick="generateSchedules()">Generate</button>
-    <button onclick="downloadCSV('kitchen')">Download Kitchen CSV</button>
-    <button onclick="downloadCSV('housework')">Download Housework CSV</button>
-    <h3>Kitchen Schedule</h3>
-    <div id="kitchenSchedulesContainer"></div>
-    <h3>Housework Schedule</h3>
-    <div id="houseworkSchedulesContainer"></div>
-  </section>
-
-  <script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
