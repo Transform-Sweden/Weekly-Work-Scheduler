@@ -42,8 +42,6 @@ function saveData(){
     localStorage.setItem("availability", JSON.stringify(availability));
 }
 
-function shuffle(array){ return array.sort(()=>Math.random()-0.5); }
-
 // ====== People ======
 addPersonBtn.addEventListener("click",()=>{
     const name = personInput.value.trim();
@@ -143,7 +141,7 @@ function renderTasks(taskArray, tableBody){
         const daysTd=document.createElement("td");
         Object.keys(task.days).forEach(day=>{
             const label=document.createElement("label"); label.className="task-label";
-            const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=task.days[day];
+            const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=!!task.days[day]; // <-- ensure boolean
             cb.onchange=()=>{task.days[day]=cb.checked; saveData();}
             label.appendChild(cb); label.appendChild(document.createTextNode(day[0]));
             daysTd.appendChild(label);
@@ -159,14 +157,21 @@ function renderTasks(taskArray, tableBody){
     });
 }
 
-// Add Task Events
+// Add Kitchen Task
 addKitchenTaskBtn.addEventListener("click",()=>{
-    const name=kitchenTaskInput.value.trim(); const count=parseInt(kitchenTaskCount.value)||1;
+    const name=kitchenTaskInput.value.trim(); 
+    const count=parseInt(kitchenTaskCount.value)||1;
     if(!name) return alert("Task name required");
-    const taskObj={name,count,days:{}}; days.forEach(d=>taskObj.days[d]=true); // kitchen tasks stay pre-checked
-    kitchenTasks.push(taskObj); renderTasks(kitchenTasks,kitchenTaskTable); kitchenTaskInput.value=""; kitchenTaskCount.value=1; saveData();
+    const taskObj={name,count,days:{}};
+    days.forEach(d=>taskObj.days[d]=true); // kitchen tasks start checked
+    kitchenTasks.push(taskObj); 
+    renderTasks(kitchenTasks,kitchenTaskTable); 
+    kitchenTaskInput.value=""; 
+    kitchenTaskCount.value=1; 
+    saveData();
 });
 
+// Add Work Task
 addWorkTaskBtn.addEventListener("click", () => {
     const name = workTaskInput.value.trim();
     const count = parseInt(workTaskCount.value) || 1;
@@ -174,7 +179,7 @@ addWorkTaskBtn.addEventListener("click", () => {
     if (!name) return alert("Task name required");
 
     const taskObj = { name, count, days: {}, genderRequired: genderReq };
-    days.forEach(d => taskObj.days[d] = false); // <-- initialize as unchecked
+    days.forEach(d => taskObj.days[d] = false); // <-- start all days unchecked
     workTasks.push(taskObj);
     renderTasks(workTasks, workTaskTable);
 
@@ -218,7 +223,7 @@ downloadBtn.addEventListener("click", ()=>{
     URL.revokeObjectURL(url);
 });
 
-// ====== Balanced Task Assignment with Day Row Grouping ======
+// ====== Balanced Task Assignment ======
 function generateSchedule(){
     kitchenScheduleTable.innerHTML=""; workScheduleTable.innerHTML="";
 
