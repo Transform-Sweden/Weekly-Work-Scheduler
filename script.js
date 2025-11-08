@@ -141,7 +141,7 @@ function renderTasks(taskArray, tableBody){
         const daysTd=document.createElement("td");
         Object.keys(task.days).forEach(day=>{
             const label=document.createElement("label"); label.className="task-label";
-            const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=!!task.days[day]; // <-- ensure boolean
+            const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=!!task.days[day];
             cb.onchange=()=>{task.days[day]=cb.checked; saveData();}
             label.appendChild(cb); label.appendChild(document.createTextNode(day[0]));
             daysTd.appendChild(label);
@@ -179,7 +179,7 @@ addWorkTaskBtn.addEventListener("click", () => {
     if (!name) return alert("Task name required");
 
     const taskObj = { name, count, days: {}, genderRequired: genderReq };
-    days.forEach(d => taskObj.days[d] = false); // <-- start all days unchecked
+    days.forEach(d => taskObj.days[d] = false); // all days unchecked
     workTasks.push(taskObj);
     renderTasks(workTasks, workTaskTable);
 
@@ -223,49 +223,75 @@ downloadBtn.addEventListener("click", ()=>{
     URL.revokeObjectURL(url);
 });
 
-// ====== Balanced Task Assignment ======
-function generateSchedule(){
-    kitchenScheduleTable.innerHTML=""; workScheduleTable.innerHTML="";
+// ====== Schedule Generation Function ======
+function generateSchedule() {
+    // Remove deleted people from availability
+    Object.keys(availability).forEach(name => {
+        if (!peopleList.find(p => p.name === name)) delete availability[name];
+    });
+    saveData();
+
+    // Clear tables
+    kitchenScheduleTable.innerHTML = "";
+    workScheduleTable.innerHTML = "";
 
     // Kitchen Schedule
-    const kHead=kitchenScheduleTable.createTHead();
-    const kHeadRow=kHead.insertRow(); kHeadRow.insertCell().textContent="Day / Task";
-    peopleList.forEach(p=>kHeadRow.insertCell().textContent=p.name);
-    const kBody=kitchenScheduleTable.createTBody(); const kDayRows={};
-    days.forEach(day=>{
-        kitchenSubTasks.forEach((sub, idx)=>{
-            const row=kBody.insertRow();
-            if(idx===0){ const dayTd=row.insertCell(); dayTd.textContent=day; dayTd.rowSpan=kitchenSubTasks.length; }
-            else row.insertCell();
-            row.insertCell().textContent=sub;
-            peopleList.forEach(()=>row.insertCell());
-            kDayRows[`${day}-${sub}`]=row;
+    const kHead = kitchenScheduleTable.createTHead();
+    const kHeadRow = kHead.insertRow();
+    kHeadRow.insertCell().textContent = "Day / Task";
+    peopleList.forEach(p => kHeadRow.insertCell().textContent = p.name);
+
+    const kBody = kitchenScheduleTable.createTBody();
+    const kDayRows = {};
+    const firstPersonCellIdx = 2;
+
+    days.forEach(day => {
+        kitchenSubTasks.forEach((sub, idx) => {
+            const row = kBody.insertRow();
+            if (idx === 0) {
+                const dayTd = row.insertCell();
+                dayTd.textContent = day;
+                dayTd.rowSpan = kitchenSubTasks.length;
+            } else row.insertCell();
+
+            row.insertCell().textContent = sub;
+            peopleList.forEach(() => row.insertCell());
+            kDayRows[`${day}-${sub}`] = row;
         });
     });
 
     // Work Schedule
-    const wHead=workScheduleTable.createTHead(); const wHeadRow=wHead.insertRow();
-    wHeadRow.insertCell().textContent="Day"; peopleList.forEach(p=>wHeadRow.insertCell().textContent=p.name);
-    const wBody=workScheduleTable.createTBody(); const wDayRows={};
-    days.forEach(d=>{ const row=wBody.insertRow(); row.insertCell().textContent=d; peopleList.forEach(()=>row.insertCell()); wDayRows[d]=row; });
+    const wHead = workScheduleTable.createTHead();
+    const wHeadRow = wHead.insertRow();
+    wHeadRow.insertCell().textContent = "Day";
+    peopleList.forEach(p => wHeadRow.insertCell().textContent = p.name);
 
-    // ====== Assigned Count Tracker ======
-    const dayTaskCount={};
+    const wBody = workScheduleTable.createTBody();
+    const wDayRows = {};
+    days.forEach(day => {
+        const row = wBody.insertRow();
+        row.insertCell().textContent = day;
+        peopleList.forEach(() => row.insertCell());
+        wDayRows[day] = row;
+    });
+
+    const dayTaskCount = {};
 
     // Assign Kitchen Tasks
-    kitchenTasks.forEach(task=>{
-        days.forEach(day=>{
-            if(task.days[day]){
-                const available = peopleList.filter(p=>availability[p.name][day][task.name]);
-                if(!available.length) return;
-                if(!dayTaskCount[day]) dayTaskCount[day]={};
-                available.forEach(p=>{ if(dayTaskCount[day][p.name]==null) dayTaskCount[day][p.name]=0; });
-                for(let i=0;i<task.count;i++){
-                    available.sort((a,b)=>dayTaskCount[day][a.name]-dayTaskCount[day][b.name]);
-                    const p=available[0];
-                    const cellIdx = peopleList.findIndex(pl=>pl.name===p.name)+1;
+    kitchenTasks.forEach(task => {
+        days.forEach(day => {
+            if (task.days[day]) {
+                const available = peopleList.filter(p => availability[p.name][day][task.name]);
+                if (!available.length) return;
+                if (!dayTaskCount[day]) dayTaskCount[day] = {};
+                available.forEach(p => { if (dayTaskCount[day][p.name] == null) dayTaskCount[day][p.name] = 0; });
+                for (let i = 0; i < task.count; i++) {
+                    available.sort((a, b) => dayTaskCount[day][a.name] - dayTaskCount[day][b.name]);
+                    const p = available[0];
+                    const cellIdx = firstPersonCellIdx + peopleList.findIndex(pl => pl.name === p.name);
                     const cell = kDayRows[`${day}-${task.name}`].cells[cellIdx];
-                    cell.textContent+=(cell.textContent?" , ":"")+task.name; cell.className="kitchen-task";
+                    cell.textContent += (cell.textContent ? ", " : "") + task.name;
+                    cell.className = "kitchen-task";
                     dayTaskCount[day][p.name]++;
                 }
             }
@@ -273,32 +299,8 @@ function generateSchedule(){
     });
 
     // Assign Work Tasks
-    workTasks.forEach(task=>{
-        days.forEach(day=>{
-            if(task.days[day]){
-                const available = peopleList.filter(p=>
-                    availability[p.name][day]["Lunch Dishes"] &&
-                    (task.genderRequired==="Any" || p.gender===task.genderRequired)
-                );
-                if(!available.length) return;
-                if(!dayTaskCount[day]) dayTaskCount[day]={};
-                available.forEach(p=>{ if(dayTaskCount[day][p.name]==null) dayTaskCount[day][p.name]=0; });
-                for(let i=0;i<task.count;i++){
-                    available.sort((a,b)=>dayTaskCount[day][a.name]-dayTaskCount[day][b.name]);
-                    const p=available[0];
-                    const cellIdx = peopleList.findIndex(pl=>pl.name===p.name)+1;
-                    const cell = wDayRows[day].cells[cellIdx];
-                    cell.textContent += (cell.textContent ? ", " : "") + task.name;
-                    cell.className = "work-task";
-                    dayTaskCount[day][p.name]++;
-                }
-            }
-        });
-    });
-}
-
-// ====== Initial Render ======
-renderPeople();
-renderAvailability();
-renderTasks(kitchenTasks, kitchenTaskTable);
-renderTasks(workTasks, workTaskTable);
+    workTasks.forEach(task => {
+        days.forEach(day => {
+            if (task.days[day]) {
+                const available = peopleList.filter(p =>
+                   
