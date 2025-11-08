@@ -28,6 +28,8 @@ const availabilityTable = document.getElementById("availability-table").querySel
 
 const generateBtn = document.getElementById("generate-btn");
 const clearBtn = document.getElementById("clear-btn");
+const downloadBtn = document.getElementById("download-btn");
+const darkmodeBtn = document.getElementById("darkmode-btn");
 
 const kitchenScheduleTable = document.getElementById("kitchen-schedule-table");
 const workScheduleTable = document.getElementById("work-schedule-table");
@@ -39,6 +41,8 @@ function saveData(){
     localStorage.setItem("workTasks", JSON.stringify(workTasks));
     localStorage.setItem("availability", JSON.stringify(availability));
 }
+
+function shuffle(array){ return array.sort(()=>Math.random()-0.5); }
 
 // ====== People ======
 addPersonBtn.addEventListener("click",()=>{
