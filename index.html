@@ -2,52 +2,84 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Weekly Work Scheduler</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1 class="title">Weekly Work Scheduler</h1>
+    <h1>Weekly Work Scheduler</h1>
 
-        <!-- People Management -->
-        <section>
-            <h2 class="section-title">People & Availability</h2>
-            <input type="text" id="personName" placeholder="Enter name">
-            <button id="addPersonBtn">Add Person</button>
-            <div id="peopleList"></div>
-        </section>
+    <section id="people-section">
+        <h2>People</h2>
+        <input type="text" id="person-name" placeholder="Enter name">
+        <button id="add-person-btn">Add Person</button>
+        <ul id="people-list"></ul>
+    </section>
 
-        <!-- Kitchen Tasks -->
-        <section>
-            <h2 class="section-title">Kitchen Tasks</h2>
-            <button id="addKitchenTaskBtn">Add Kitchen Task</button>
-            <div id="kitchenTasksList"></div>
-        </section>
+    <section id="kitchen-section">
+        <h2>Kitchen Tasks</h2>
+        <input type="text" id="kitchen-task-name" placeholder="Enter task">
+        <input type="number" id="kitchen-task-count" placeholder="People needed" min="1" value="1">
+        <button id="add-kitchen-task-btn">Add Task</button>
+        <table id="kitchen-task-table">
+            <thead>
+                <tr>
+                    <th>Task</th>
+                    <th>People Needed</th>
+                    <th>Days Needed</th>
+                    <th>Remove</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </section>
 
-        <!-- Work Duties -->
-        <section>
-            <h2 class="section-title">Work Duties</h2>
-            <button id="addWorkTaskBtn">Add Work Duty</button>
-            <div id="workTasksList"></div>
-        </section>
+    <section id="work-section">
+        <h2>Work Duties</h2>
+        <input type="text" id="work-task-name" placeholder="Enter task">
+        <input type="number" id="work-task-count" placeholder="People needed" min="1" value="1">
+        <button id="add-work-task-btn">Add Task</button>
+        <table id="work-task-table">
+            <thead>
+                <tr>
+                    <th>Task</th>
+                    <th>People Needed</th>
+                    <th>Days Needed</th>
+                    <th>Remove</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </section>
 
-        <!-- Schedule Generation -->
-        <section>
-            <h2 class="section-title">Generate Schedule</h2>
-            <button id="generateScheduleBtn">Generate Schedule</button>
-            <button id="clearScheduleBtn">Clear Schedule</button>
-        </section>
+    <section id="availability-section">
+        <h2>Availability</h2>
+        <table id="availability-table">
+            <thead>
+                <tr>
+                    <th>Person</th>
+                    <th>Mon</th>
+                    <th>Tue</th>
+                    <th>Wed</th>
+                    <th>Thu</th>
+                    <th>Fri</th>
+                    <th>Sat</th>
+                    <th>Sun</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </section>
 
-        <!-- Generated Schedule Display -->
-        <section id="scheduleDisplay">
-            <h2 class="section-title">Generated Kitchen Schedule</h2>
-            <div id="kitchenSchedule"></div>
+    <button id="generate-btn">Generate Schedule</button>
+    <button id="clear-btn">Clear Schedule</button>
 
-            <h2 class="section-title">Generated Work Duties Schedule</h2>
-            <div id="workSchedule"></div>
-        </section>
-    </div>
+    <section id="schedule-section">
+        <h2>Generated Kitchen Schedule</h2>
+        <table id="kitchen-schedule-table"></table>
+
+        <h2>Generated Work Duties Schedule</h2>
+        <table id="work-schedule-table"></table>
+    </section>
 
     <script src="script.js"></script>
 </body>
