@@ -28,8 +28,6 @@ const availabilityTable = document.getElementById("availability-table").querySel
 
 const generateBtn = document.getElementById("generate-btn");
 const clearBtn = document.getElementById("clear-btn");
-const downloadBtn = document.getElementById("download-btn");
-const darkmodeBtn = document.getElementById("darkmode-btn");
 
 const kitchenScheduleTable = document.getElementById("kitchen-schedule-table");
 const workScheduleTable = document.getElementById("work-schedule-table");
@@ -41,8 +39,6 @@ function saveData(){
     localStorage.setItem("workTasks", JSON.stringify(workTasks));
     localStorage.setItem("availability", JSON.stringify(availability));
 }
-
-function shuffle(array){ return array.sort(()=>Math.random()-0.5); }
 
 // ====== People ======
 addPersonBtn.addEventListener("click",()=>{
@@ -181,40 +177,50 @@ addWorkTaskBtn.addEventListener("click",()=>{
 generateBtn.addEventListener("click",()=>generateSchedule());
 clearBtn.addEventListener("click",()=>{ kitchenScheduleTable.innerHTML=""; workScheduleTable.innerHTML=""; });
 
-// ====== Balanced Task Assignment ======
+// ====== Balanced Task Assignment with Day Row Grouping ======
 function generateSchedule(){
     kitchenScheduleTable.innerHTML=""; workScheduleTable.innerHTML="";
 
-    // Kitchen schedule
+    // Kitchen Schedule
     const kHead=kitchenScheduleTable.createTHead();
-    const kHeadRow=kHead.insertRow(); kHeadRow.insertCell().textContent="Day - Task";
+    const kHeadRow=kHead.insertRow(); kHeadRow.insertCell().textContent="Day / Task";
     peopleList.forEach(p=>kHeadRow.insertCell().textContent=p.name);
     const kBody=kitchenScheduleTable.createTBody(); const kDayRows={};
-    days.forEach(d=>kitchenSubTasks.forEach(sub=>{
-        const row=kBody.insertRow(); row.insertCell().textContent=`${d} - ${sub}`;
-        peopleList.forEach(()=>row.insertCell());
-        kDayRows[`${d}-${sub}`]=row;
-    }));
+    days.forEach(day=>{
+        kitchenSubTasks.forEach((sub, idx)=>{
+            const row=kBody.insertRow();
+            if(idx===0){ const dayTd=row.insertCell(); dayTd.textContent=day; dayTd.rowSpan=kitchenSubTasks.length; }
+            else row.insertCell();
+            row.insertCell().textContent=sub;
+            peopleList.forEach(()=>row.insertCell());
+            kDayRows[`${day}-${sub}`]=row;
+        });
+    });
 
-    // Work schedule
+    // Work Schedule
     const wHead=workScheduleTable.createTHead(); const wHeadRow=wHead.insertRow();
     wHeadRow.insertCell().textContent="Day"; peopleList.forEach(p=>wHeadRow.insertCell().textContent=p.name);
     const wBody=workScheduleTable.createTBody(); const wDayRows={};
     days.forEach(d=>{ const row=wBody.insertRow(); row.insertCell().textContent=d; peopleList.forEach(()=>row.insertCell()); wDayRows[d]=row; });
+
+    // ====== Assigned Count Tracker ======
+    const dayTaskCount={};
 
     // Assign Kitchen Tasks
     kitchenTasks.forEach(task=>{
         days.forEach(day=>{
             if(task.days[day]){
                 const available = peopleList.filter(p=>availability[p.name][day][task.name]);
-                const assignedCount = {}; available.forEach(p=>assignedCount[p.name]=0);
+                if(!available.length) return;
+                if(!dayTaskCount[day]) dayTaskCount[day]={};
+                available.forEach(p=>{ if(dayTaskCount[day][p.name]==null) dayTaskCount[day][p.name]=0; });
                 for(let i=0;i<task.count;i++){
-                    available.sort((a,b)=>assignedCount[a.name]-assignedCount[b.name]);
+                    available.sort((a,b)=>dayTaskCount[day][a.name]-dayTaskCount[day][b.name]);
                     const p=available[0];
                     const cellIdx = peopleList.findIndex(pl=>pl.name===p.name)+1;
                     const cell = kDayRows[`${day}-${task.name}`].cells[cellIdx];
                     cell.textContent+=(cell.textContent?" , ":"")+task.name; cell.className="kitchen-task";
-                    assignedCount[p.name]++;
+                    dayTaskCount[day][p.name]++;
                 }
             }
         });
@@ -224,47 +230,23 @@ function generateSchedule(){
     workTasks.forEach(task=>{
         days.forEach(day=>{
             if(task.days[day]){
-                const available = peopleList.filter(p=>{
-                    return availability[p.name][day]["Lunch Dishes"] && 
-                           (task.genderRequired==="Any" || p.gender===task.genderRequired);
-                });
-                const assignedCount={}; available.forEach(p=>assignedCount[p.name]=0);
+                const available = peopleList.filter(p=>
+                    availability[p.name][day]["Lunch Dishes"] &&
+                    (task.genderRequired==="Any" || p.gender===task.genderRequired)
+                );
+                if(!available.length) return;
+                if(!dayTaskCount[day]) dayTaskCount[day]={};
+                available.forEach(p=>{ if(dayTaskCount[day][p.name]==null) dayTaskCount[day][p.name]=0; });
                 for(let i=0;i<task.count;i++){
-                    available.sort((a,b)=>assignedCount[a.name]-assignedCount[b.name]);
+                    available.sort((a,b)=>dayTaskCount[day][a.name]-dayTaskCount[day][b.name]);
                     const p=available[0];
                     const cellIdx = peopleList.findIndex(pl=>pl.name===p.name)+1;
                     const cell = wDayRows[day].cells[cellIdx];
-                    cell.textContent+=(cell.textContent?" , ":"")+task.name; cell.className="work-task";
-                    assignedCount[p.name]++;
+                    cell.textContent += (cell.textContent ? ", " : "") + task.name;
+                    cell.className = "work-task";
+                    dayTaskCount[day][p.name]++;
                 }
             }
         });
     });
 }
-
-// ====== CSV Download ======
-downloadBtn.addEventListener("click", () => {
-    let csv = "";
-    // Kitchen
-    csv += "Kitchen Schedule\n"; csv += "Day/Task,"+peopleList.map(p=>p.name).join(",")+"\n";
-    days.forEach(d=>kitchenSubTasks.forEach(sub=>{
-        csv+=`${d} - ${sub},`;
-        const r = Array.from(kitchenScheduleTable.querySelector("tbody").rows).find(r=>r.cells[0].textContent===`${d} - ${sub}`);
-        if(r) csv+=Array.from(r.cells).slice(1).map(c=>c.textContent).join(",");
-        csv+="\n";
-    }));
-    csv+="\nWork Duties Schedule\n"; csv+="Day,"+peopleList.map(p=>p.name).join(",")+"\n";
-    days.forEach(d=>{
-        csv+=`${d},`;
-        const r=Array.from(workScheduleTable.querySelector("tbody").rows).find(r=>r.cells[0].textContent===d);
-        if(r) csv+=Array.from(r.cells).slice(1).map(c=>c.textContent).join(",");
-        csv+="\n";
-    });
-    const blob=new Blob([csv],{type:"text/csv"});
-    const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="weekly_schedule.csv"; a.click(); URL.revokeObjectURL(url);
-});
-
-// ====== Dark Mode ======
-darkmodeBtn.addEventListener("click",()=>document.body.classList.toggle("dark"));
-
-// ====== Initial Render ======
