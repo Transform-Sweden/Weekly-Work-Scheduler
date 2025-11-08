@@ -34,7 +34,7 @@ button {
   background-color: #eee;
 }
 
-#taskTimes {
+#taskDays {
   margin: 10px 0;
 }
 
@@ -51,35 +51,4 @@ button {
   right: 5px;
   background-color: red;
   color: white;
-}
-
-.task-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 5px;
-}
-
-.day-column {
-  border: 1px solid #aaa;
-  padding: 5px;
-  min-height: 50px;
-}
-
-.day-column h4 {
-  text-align: center;
-  margin: 0;
-  margin-bottom: 5px;
-  background-color: #eee;
-  padding: 3px;
-}
-
-.task-item {
-  background-color: #cce5ff;
-  margin: 3px 0;
-  padding: 3px;
-  cursor: grab;
-}
-
-.task-item.dragging {
-  opacity: 0.5;
 }
