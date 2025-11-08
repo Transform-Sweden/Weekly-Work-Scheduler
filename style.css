@@ -1,48 +1,80 @@
 body {
-    font-family: Arial, sans-serif;
-    margin: 20px;
-    background-color: #f4f4f4;
+  font-family: Arial, sans-serif;
+  margin: 20px;
+  background: #f9f9f9;
 }
 
-h1, h2 {
-    text-align: left;
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
 }
 
-input, button {
-    margin: 5px 0;
+h1, h2, h3 {
+  margin-top: 20px;
+  margin-bottom: 10px;
 }
 
-section {
-    background: white;
-    padding: 15px;
-    margin-bottom: 20px;
-    border-radius: 5px;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
-}
-
-th, td {
-    border: 1px solid #ddd;
-    padding: 8px;
-    text-align: center;
-}
-
-th {
-    background-color: #f2f2f2;
+input[type="text"], input[type="number"] {
+  padding: 5px;
+  margin-right: 5px;
 }
 
 button {
-    cursor: pointer;
+  padding: 5px 10px;
+  margin-right: 5px;
 }
 
-.remove-btn {
-    background-color: red;
-    color: white;
-    border: none;
-    padding: 3px 6px;
-    border-radius: 3px;
+ul {
+  list-style-type: none;
+  padding-left: 0;
+}
+
+li {
+  margin: 5px 0;
+}
+
+.task-group {
+  margin-bottom: 20px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+th, td {
+  border: 1px solid #ccc;
+  padding: 5px;
+  text-align: center;
+}
+
+th {
+  background: #eee;
+}
+
+#schedules {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+#kitchen-grid, #work-grid {
+  overflow-x: auto;
+}
+
+.grid-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.grid-table th, .grid-table td {
+  border: 1px solid #aaa;
+  padding: 5px;
+  text-align: center;
+}
+
+.grid-table th {
+  background: #ddd;
 }
