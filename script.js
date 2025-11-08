@@ -1,13 +1,13 @@
 let people = [];
 let kitchenTasks = [];
 let workTasks = [];
-let days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+let days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 
 // ---------------- PEOPLE ----------------
 function addPerson() {
   const nameInput = document.getElementById("person-name");
   const name = nameInput.value.trim();
-  if (!name || people.includes(name)) return;
+  if(!name || people.includes(name)) return;
   people.push(name);
   nameInput.value = "";
   renderPeople();
@@ -15,7 +15,7 @@ function addPerson() {
 }
 
 function removePerson(name) {
-  people = people.filter(p => p !== name);
+  people = people.filter(p=>p!==name);
   renderPeople();
   renderAvailability();
 }
@@ -23,7 +23,7 @@ function removePerson(name) {
 function renderPeople() {
   const ul = document.getElementById("people-list");
   ul.innerHTML = "";
-  people.forEach(person => {
+  people.forEach(person=>{
     const li = document.createElement("li");
     li.textContent = person + " ";
     const btn = document.createElement("button");
@@ -38,21 +38,21 @@ function renderPeople() {
 function addKitchenTask() {
   const name = document.getElementById("kitchen-task-name").value.trim();
   const amount = parseInt(document.getElementById("kitchen-task-amount").value);
-  if (!name || amount < 1) return;
-  kitchenTasks.push({name, amount});
+  if(!name || amount<1) return;
+  kitchenTasks.push({name,amount});
   renderTasks();
 }
 
 function addWorkTask() {
   const name = document.getElementById("work-task-name").value.trim();
   const amount = parseInt(document.getElementById("work-task-amount").value);
-  if (!name || amount < 1) return;
-  workTasks.push({name, amount});
+  if(!name || amount<1) return;
+  workTasks.push({name,amount});
   renderTasks();
 }
 
-function removeTask(type, index) {
-  if (type === "kitchen") kitchenTasks.splice(index,1);
+function removeTask(type,index) {
+  if(type==="kitchen") kitchenTasks.splice(index,1);
   else workTasks.splice(index,1);
   renderTasks();
 }
@@ -60,24 +60,24 @@ function removeTask(type, index) {
 function renderTasks() {
   const kitchenUl = document.getElementById("kitchen-task-list");
   kitchenUl.innerHTML = "";
-  kitchenTasks.forEach((task, i) => {
+  kitchenTasks.forEach((task,i)=>{
     const li = document.createElement("li");
     li.textContent = `${task.name} (${task.amount}) `;
     const btn = document.createElement("button");
     btn.textContent = "Remove";
-    btn.onclick = () => removeTask("kitchen", i);
+    btn.onclick = () => removeTask("kitchen",i);
     li.appendChild(btn);
     kitchenUl.appendChild(li);
   });
 
   const workUl = document.getElementById("work-task-list");
   workUl.innerHTML = "";
-  workTasks.forEach((task, i) => {
+  workTasks.forEach((task,i)=>{
     const li = document.createElement("li");
     li.textContent = `${task.name} (${task.amount}) `;
     const btn = document.createElement("button");
     btn.textContent = "Remove";
-    btn.onclick = () => removeTask("work", i);
+    btn.onclick = () => removeTask("work",i);
     li.appendChild(btn);
     workUl.appendChild(li);
   });
@@ -87,18 +87,18 @@ function renderTasks() {
 function renderAvailability() {
   const tbody = document.querySelector("#availability-table tbody");
   tbody.innerHTML = "";
-  people.forEach(person => {
-    days.forEach(day => {
+  people.forEach(person=>{
+    days.forEach(day=>{
       const tr = document.createElement("tr");
       tr.innerHTML = `<td>${person}</td><td>${day}</td>`;
       const tasks = ["Breakfast","Lunch","LunchDishes","Dinner","DinnerDishes","WorkDuties"];
-      tasks.forEach(task => {
+      tasks.forEach(task=>{
         const td = document.createElement("td");
         const cb = document.createElement("input");
         cb.type = "checkbox";
         cb.checked = true;
         cb.onchange = () => {
-          if(task === "LunchDishes") {
+          if(task==="LunchDishes") {
             const workCb = td.parentElement.querySelector("td:last-child input");
             workCb.checked = cb.checked;
           }
@@ -120,24 +120,22 @@ function generateSchedule() {
   kitchenGrid.innerHTML = "";
   workGrid.innerHTML = "";
 
-  // Simple balanced assignment
-  function createGrid(tasks, gridDiv) {
+  function createGrid(tasks,gridDiv){
     const table = document.createElement("table");
     table.className = "grid-table";
     const thead = document.createElement("thead");
     const trHead = document.createElement("tr");
-    trHead.innerHTML = "<th>Task</th>" + days.map(d=>`<th>${d}</th>`).join("");
+    trHead.innerHTML = "<th>Task</th>"+days.map(d=>`<th>${d}</th>`).join("");
     thead.appendChild(trHead);
     table.appendChild(thead);
 
     const tbody = document.createElement("tbody");
-    tasks.forEach(task => {
+    tasks.forEach(task=>{
       const tr = document.createElement("tr");
       tr.innerHTML = `<td>${task.name}</td>`;
-      days.forEach(day => {
+      days.forEach(day=>{
         const td = document.createElement("td");
-        // Pick available people
-        const available = people.filter(person => {
+        const available = people.filter(person=>{
           const row = [...document.querySelectorAll("#availability-table tbody tr")]
                       .find(r => r.cells[0].textContent===person && r.cells[1].textContent===day);
           const taskIndex = {"Breakfast":2,"Lunch":3,"LunchDishes":4,"Dinner":5,"DinnerDishes":6,"WorkDuties":7}[task.name] || 2;
@@ -156,9 +154,9 @@ function generateSchedule() {
   createGrid(workTasks,workGrid);
 }
 
-function clearSchedule() {
-  document.getElementById("kitchen-grid").innerHTML = "";
-  document.getElementById("work-grid").innerHTML = "";
+function clearSchedule(){
+  document.getElementById("kitchen-grid").innerHTML="";
+  document.getElementById("work-grid").innerHTML="";
 }
 
 // Initial render
