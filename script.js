@@ -1,11 +1,13 @@
-console.log("Scheduler Version 1.3.0 - Balanced Kitchen + Reset Fix");
+console.log("Scheduler Version 1.4.0 - Dark Mode + CSV Download");
 
+// ---------- CONSTANTS ----------
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 let people = JSON.parse(localStorage.getItem("people")) || [];
 let kitchenTasks = JSON.parse(localStorage.getItem("kitchenTasks")) || [];
 let workTasks = JSON.parse(localStorage.getItem("workTasks")) || [];
+let darkMode = localStorage.getItem("darkMode") === "true";
 
-/* ---------- SAVE & RENDER ---------- */
+// ---------- SAVE & RENDER ----------
 function saveData() {
   localStorage.setItem("people", JSON.stringify(people));
   localStorage.setItem("kitchenTasks", JSON.stringify(kitchenTasks));
@@ -112,7 +114,7 @@ function renderWorkTasks() {
   });
 }
 
-/* ---------- ADD BUTTONS ---------- */
+// ---------- ADD BUTTONS ----------
 document.getElementById("add-person-btn").onclick = () => {
   const name = document.getElementById("person-name").value.trim();
   const gender = document.getElementById("person-gender").value;
@@ -126,8 +128,9 @@ document.getElementById("add-person-btn").onclick = () => {
 
 document.getElementById("add-kitchen-task-btn").onclick = () => {
   const name = document.getElementById("kitchen-task-name").value.trim();
-  const count = parseInt(document.getElementById("kitchen-task-count").value);
+  let count = parseInt(document.getElementById("kitchen-task-count").value);
   if (!name) return alert("Enter a task name.");
+  if (isNaN(count) || count < 1) count = 1;
   kitchenTasks.push({ name, count, days: [...days] });
   document.getElementById("kitchen-task-name").value = "";
   saveData();
@@ -136,16 +139,17 @@ document.getElementById("add-kitchen-task-btn").onclick = () => {
 
 document.getElementById("add-work-task-btn").onclick = () => {
   const name = document.getElementById("work-task-name").value.trim();
-  const count = parseInt(document.getElementById("work-task-count").value);
+  let count = parseInt(document.getElementById("work-task-count").value);
   const gender = document.getElementById("work-task-gender").value;
   if (!name) return alert("Enter a task name.");
+  if (isNaN(count) || count < 1) count = 1;
   workTasks.push({ name, count, gender, days: [...days] });
   document.getElementById("work-task-name").value = "";
   saveData();
   renderWorkTasks();
 };
 
-/* ---------- AVAILABILITY ---------- */
+// ---------- AVAILABILITY ----------
 function renderAvailability() {
   const tbody = document.querySelector("#availability-table tbody");
   tbody.innerHTML = "";
@@ -184,7 +188,7 @@ function renderAvailability() {
   });
 }
 
-/* ---------- GENERATE SCHEDULE ---------- */
+// ---------- GENERATE SCHEDULE ----------
 document.getElementById("generate-btn").onclick = generateSchedule;
 document.getElementById("clear-btn").onclick = () => {
   document.querySelector("#kitchen-schedule-table").innerHTML = "";
@@ -192,24 +196,26 @@ document.getElementById("clear-btn").onclick = () => {
 };
 
 function generateSchedule() {
+  if (!people.length || (!kitchenTasks.length && !workTasks.length)) {
+    return alert("Add people and tasks before generating schedule.");
+  }
   generateKitchenSchedule();
   generateWorkSchedule();
 }
 
+// ---------- SCHEDULE GENERATION FUNCTIONS ----------
 function generateKitchenSchedule() {
   const table = document.getElementById("kitchen-schedule-table");
   table.innerHTML = "";
   const head = table.createTHead();
   const hRow = head.insertRow();
-  hRow.innerHTML = `<th>Day</th><th>Task</th>${people
-    .map((p) => `<th>${p.name}</th>`)
-    .join("")}`;
+  hRow.innerHTML = `<th>Day</th><th>Task</th>${people.map(p => `<th>${p.name}</th>`).join("")}`;
   const body = table.createTBody();
 
-  const load = Object.fromEntries(people.map((p) => [p.name, 0]));
+  const load = Object.fromEntries(people.map(p => [p.name, 0]));
 
   days.forEach((day) => {
-    const dayTasks = kitchenTasks.filter((t) => t.days.includes(day));
+    const dayTasks = kitchenTasks.filter(t => t.days.includes(day));
     const assignedToday = new Set();
     dayTasks.forEach((t, idx) => {
       const row = body.insertRow();
@@ -227,14 +233,12 @@ function generateKitchenSchedule() {
         td.textContent = "";
       });
 
-      const eligible = people.filter((p) => !assignedToday.has(p.name));
-      eligible.sort(
-        (a, b) => load[a.name] - load[b.name] || Math.random() - 0.5
-      );
+      const eligible = people.filter(p => !assignedToday.has(p.name));
+      eligible.sort((a,b) => load[a.name]-load[b.name] || Math.random()-0.5);
       const chosen = eligible.slice(0, Math.min(t.count, eligible.length));
-      chosen.forEach((p) => {
-        const index = people.findIndex((x) => x.name === p.name);
-        row.cells[index + 2].textContent = "✔️";
+      chosen.forEach(p => {
+        const index = people.findIndex(x => x.name===p.name);
+        row.cells[index+2].textContent = "✔️";
         load[p.name]++;
         assignedToday.add(p.name);
       });
@@ -247,15 +251,13 @@ function generateWorkSchedule() {
   table.innerHTML = "";
   const head = table.createTHead();
   const hRow = head.insertRow();
-  hRow.innerHTML = `<th>Day</th><th>Task</th>${people
-    .map((p) => `<th>${p.name}</th>`)
-    .join("")}`;
+  hRow.innerHTML = `<th>Day</th><th>Task</th>${people.map(p => `<th>${p.name}</th>`).join("")}`;
   const body = table.createTBody();
 
-  const load = Object.fromEntries(people.map((p) => [p.name, 0]));
+  const load = Object.fromEntries(people.map(p => [p.name, 0]));
 
   days.forEach((day) => {
-    const dayTasks = workTasks.filter((t) => t.days.includes(day));
+    const dayTasks = workTasks.filter(t => t.days.includes(day));
     const assignedToday = new Set();
     dayTasks.forEach((t, idx) => {
       const row = body.insertRow();
@@ -274,17 +276,13 @@ function generateWorkSchedule() {
       });
 
       let eligible = people.filter(
-        (p) =>
-          !assignedToday.has(p.name) &&
-          (t.gender === "Any" || t.gender === p.gender)
+        (p) => !assignedToday.has(p.name) && (t.gender==="Any" || t.gender===p.gender)
       );
-      eligible.sort(
-        (a, b) => load[a.name] - load[b.name] || Math.random() - 0.5
-      );
+      eligible.sort((a,b) => load[a.name]-load[b.name] || Math.random()-0.5);
       const chosen = eligible.slice(0, Math.min(t.count, eligible.length));
-      chosen.forEach((p) => {
-        const index = people.findIndex((x) => x.name === p.name);
-        row.cells[index + 2].textContent = "✔️";
+      chosen.forEach(p => {
+        const index = people.findIndex(x => x.name===p.name);
+        row.cells[index+2].textContent = "✔️";
         load[p.name]++;
         assignedToday.add(p.name);
       });
@@ -292,7 +290,7 @@ function generateWorkSchedule() {
   });
 }
 
-/* ---------- RESET ALL (bottom box) ---------- */
+// ---------- RESET ALL ----------
 const resetSection = document.createElement("section");
 resetSection.style.background = "#fff8e1";
 resetSection.style.border = "2px solid #ffeb3b";
@@ -313,7 +311,42 @@ document.getElementById("reset-all-btn").addEventListener("click", () => {
   }
 });
 
-/* ---------- INIT ---------- */
+// ---------- DARK MODE ----------
+const body = document.body;
+function applyDarkMode() {
+  body.classList.toggle("dark", darkMode);
+  localStorage.setItem("darkMode", darkMode);
+}
+document.getElementById("darkmode-btn").addEventListener("click", () => {
+  darkMode = !darkMode;
+  applyDarkMode();
+});
+applyDarkMode();
+
+// ---------- DOWNLOAD CSV ----------
+function tableToCSV(table) {
+  let csv = [];
+  const rows = table.querySelectorAll("tr");
+  rows.forEach(row => {
+    const cols = row.querySelectorAll("th, td");
+    csv.push(Array.from(cols).map(c => c.textContent.replace(/,/g, "")).join(","));
+  });
+  return csv.join("\n");
+}
+
+document.getElementById("download-btn").addEventListener("click", () => {
+  let csvContent = "Kitchen Schedule\n" + tableToCSV(document.getElementById("kitchen-schedule-table")) +
+                   "\n\nWork Schedule\n" + tableToCSV(document.getElementById("work-schedule-table"));
+  const blob = new Blob([csvContent], {type: "text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "weekly_schedule.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ---------- INIT ----------
 renderPeople();
 renderKitchenTasks();
 renderWorkTasks();
