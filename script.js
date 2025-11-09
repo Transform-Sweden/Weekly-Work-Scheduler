@@ -45,28 +45,28 @@ function saveData(){
 function shuffle(array){ return array.sort(()=>Math.random()-0.5); }
 
 // ====== People ======
-addPersonBtn.addEventListener("click",()=>{
+addPersonBtn.addEventListener("click", () => {
   const name = personInput.value.trim();
   const gender = personGender.value;
-  if(!name) return alert("Name required");
-  if(!peopleList.find(p=>p.name===name)){
-    peopleList.push({name, gender});
-    availability[name]={};
-    days.forEach(day=>{
-      availability[name][day]={};
-      kitchenSubTasks.forEach(task=>availability[name][day][task]=true);
-      availability[name][day]["Work Duty"]=true;
+  if (!name) return alert("Name required");
+  if (!peopleList.find(p => p.name === name)) {
+    peopleList.push({ name, gender });
+    availability[name] = {};
+    days.forEach(day => {
+      availability[name][day] = {};
+      kitchenSubTasks.forEach(task => availability[name][day][task] = true);
+      availability[name][day]["Work Duty"] = true;
     });
     renderPeople();
     renderAvailability();
     saveData();
-    personInput.value="";
+    personInput.value = "";
   }
 });
 
 function removePerson(name){
   const idx = peopleList.findIndex(p=>p.name===name);
-  if(idx>-1){
+  if (idx > -1){
     peopleList.splice(idx,1);
     delete availability[name];
     renderPeople();
@@ -76,14 +76,14 @@ function removePerson(name){
 }
 
 function renderPeople(){
-  peopleUl.innerHTML="";
+  peopleUl.innerHTML = "";
   peopleList.forEach(p=>{
-    const li=document.createElement("li");
-    li.textContent=`${p.name} (${p.gender}) `;
-    const btn=document.createElement("button");
-    btn.textContent="Remove";
-    btn.className="remove-btn";
-    btn.onclick=()=>removePerson(p.name);
+    const li = document.createElement("li");
+    li.textContent = `${p.name} (${p.gender}) `;
+    const btn = document.createElement("button");
+    btn.textContent = "Remove";
+    btn.className = "remove-btn";
+    btn.onclick = ()=>removePerson(p.name);
     li.appendChild(btn);
     peopleUl.appendChild(li);
   });
@@ -91,32 +91,41 @@ function renderPeople(){
 
 // ====== Availability ======
 function renderAvailability(){
-  availabilityTable.innerHTML="";
+  availabilityTable.innerHTML = "";
+
+  // Ensure availability structure exists for all people/days/tasks
+  peopleList.forEach(p=>{
+    if(!availability[p.name]) availability[p.name] = {};
+    days.forEach(day=>{
+      if(!availability[p.name][day]) availability[p.name][day] = {};
+      kitchenSubTasks.forEach(sub => {
+        if(availability[p.name][day][sub] === undefined) availability[p.name][day][sub] = true;
+      });
+      if(availability[p.name][day]["Work Duty"] === undefined) availability[p.name][day]["Work Duty"] = true;
+    });
+  });
+
   peopleList.forEach(p=>{
     const tasks = kitchenSubTasks.concat(["Work Duty"]);
     tasks.forEach((task, idx)=>{
-      const tr=document.createElement("tr");
-      if(idx===0){
-        const nameTd=document.createElement("td");
-        nameTd.textContent=p.name;
-        nameTd.rowSpan=tasks.length;
+      const tr = document.createElement("tr");
+      if(idx === 0){
+        const nameTd = document.createElement("td");
+        nameTd.textContent = p.name;
+        nameTd.rowSpan = tasks.length;
         tr.appendChild(nameTd);
       }
-      const taskTd=document.createElement("td");
-      taskTd.textContent=task;
+      const taskTd = document.createElement("td");
+      taskTd.textContent = task;
       tr.appendChild(taskTd);
 
       days.forEach(day=>{
-        const td=document.createElement("td");
-        const cb=document.createElement("input");
-        cb.type="checkbox";
-        // ensure availability object exists
-        if(!availability[p.name]) availability[p.name]={};
-        if(!availability[p.name][day]) availability[p.name][day]={};
-        if(availability[p.name][day][task]===undefined) availability[p.name][day][task]=true;
-        cb.checked=!!availability[p.name][day][task];
-        cb.onchange=()=>{
-          availability[p.name][day][task]=cb.checked;
+        const td = document.createElement("td");
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = !!availability[p.name][day][task];
+        cb.onchange = ()=>{
+          availability[p.name][day][task] = cb.checked;
           saveData();
         };
         td.appendChild(cb);
@@ -129,162 +138,180 @@ function renderAvailability(){
 
 // ====== Tasks UI ======
 function renderTasks(taskArray, tableBody){
-  tableBody.innerHTML="";
+  tableBody.innerHTML = "";
   taskArray.forEach((task, idx)=>{
-    const tr=document.createElement("tr");
-    const nameTd=document.createElement("td"); nameTd.textContent=task.name; tr.appendChild(nameTd);
+    const tr = document.createElement("tr");
 
-    const countTd=document.createElement("td");
-    const countInput=document.createElement("input");
-    countInput.type="number"; countInput.value=task.count; countInput.min=1;
-    countInput.onchange=()=>{task.count=parseInt(countInput.value)||1; saveData();}
-    countTd.appendChild(countInput); tr.appendChild(countTd);
+    const nameTd = document.createElement("td");
+    nameTd.textContent = task.name;
+    tr.appendChild(nameTd);
 
-    const daysTd=document.createElement("td");
+    const countTd = document.createElement("td");
+    const countInput = document.createElement("input");
+    countInput.type = "number";
+    countInput.value = task.count;
+    countInput.min = 1;
+    countInput.onchange = ()=>{ task.count = parseInt(countInput.value) || 1; saveData(); };
+    countTd.appendChild(countInput);
+    tr.appendChild(countTd);
+
+    const daysTd = document.createElement("td");
     days.forEach(d=>{
-      const label=document.createElement("label"); label.className="task-label";
-      const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=!!task.days[d];
-      cb.onchange=()=>{task.days[d]=cb.checked; saveData();}
+      const label = document.createElement("label"); label.className = "task-label";
+      const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!task.days[d];
+      cb.onchange = ()=>{ task.days[d] = cb.checked; saveData(); };
       label.appendChild(cb); label.appendChild(document.createTextNode(d[0]));
       daysTd.appendChild(label);
     });
     tr.appendChild(daysTd);
 
-    const removeTd=document.createElement("td");
-    const btn=document.createElement("button"); btn.textContent="Remove"; btn.className="remove-btn";
-    btn.onclick=()=>{taskArray.splice(idx,1); renderTasks(taskArray,tableBody); saveData();}
-    removeTd.appendChild(btn); tr.appendChild(removeTd);
+    const removeTd = document.createElement("td");
+    const btn = document.createElement("button");
+    btn.textContent = "Remove";
+    btn.className = "remove-btn";
+    btn.onclick = ()=>{ taskArray.splice(idx,1); renderTasks(taskArray, tableBody); saveData(); };
+    removeTd.appendChild(btn);
+    tr.appendChild(removeTd);
 
     tableBody.appendChild(tr);
   });
 }
 
 // ====== Add Tasks ======
-addKitchenTaskBtn.addEventListener("click",()=>{
-  const name=kitchenTaskInput.value.trim(); const count=parseInt(kitchenTaskCount.value)||1;
+addKitchenTaskBtn.addEventListener("click", ()=>{
+  const name = kitchenTaskInput.value.trim();
+  const count = parseInt(kitchenTaskCount.value) || 1;
   if(!name) return alert("Task name required");
-  const taskObj={name,count,days:{}};
-  days.forEach(d=>taskObj.days[d]=false);
-  kitchenTasks.push(taskObj); renderTasks(kitchenTasks,kitchenTaskTable); kitchenTaskInput.value=""; kitchenTaskCount.value=1; saveData();
+  const taskObj = { name, count, days: {} };
+  days.forEach(d => taskObj.days[d] = false);
+  kitchenTasks.push(taskObj);
+  renderTasks(kitchenTasks, kitchenTaskTable);
+  kitchenTaskInput.value = "";
+  kitchenTaskCount.value = 1;
+  saveData();
 });
 
-addWorkTaskBtn.addEventListener("click",()=>{
-  const name=workTaskInput.value.trim(); const count=parseInt(workTaskCount.value)||1;
+addWorkTaskBtn.addEventListener("click", ()=>{
+  const name = workTaskInput.value.trim();
+  const count = parseInt(workTaskCount.value) || 1;
   const genderReq = workTaskGender.value;
   if(!name) return alert("Task name required");
-  const taskObj={name,count,days:{}, genderRequired: genderReq};
-  days.forEach(d=>taskObj.days[d]=false);
-  workTasks.push(taskObj); renderTasks(workTasks,workTaskTable);
-  workTaskInput.value=""; workTaskCount.value=1; workTaskGender.value="Any"; saveData();
+  const taskObj = { name, count, days: {}, genderRequired: genderReq };
+  days.forEach(d => taskObj.days[d] = false);
+  workTasks.push(taskObj);
+  renderTasks(workTasks, workTaskTable);
+  workTaskInput.value = "";
+  workTaskCount.value = 1;
+  workTaskGender.value = "Any";
+  saveData();
 });
 
 // ====== Generate & Clear ======
-generateBtn.addEventListener("click",()=>generateSchedule());
-clearBtn.addEventListener("click",()=>{ kitchenScheduleTable.innerHTML=""; workScheduleTable.innerHTML=""; });
+generateBtn.addEventListener("click", ()=>generateSchedule());
+clearBtn.addEventListener("click", ()=>{ kitchenScheduleTable.innerHTML=""; workScheduleTable.innerHTML=""; });
 
-// ====== Scheduler (fixed) ======
+// ====== Scheduler ======
 function generateSchedule(){
   // clear tables
-  kitchenScheduleTable.innerHTML="";
-  workScheduleTable.innerHTML="";
+  kitchenScheduleTable.innerHTML = "";
+  workScheduleTable.innerHTML = "";
 
-  // remove orphan availability
+  // cleanup availability entries for deleted people
   Object.keys(availability).forEach(name=>{
     if(!peopleList.find(p=>p.name===name)) delete availability[name];
   });
   saveData();
 
-  if(peopleList.length===0) return alert("Add people first!");
+  if(peopleList.length === 0) return alert("Add people first!");
 
-  // create kitchen header (two leading header cells: Day and Task)
+  // --- headers ---
+  // kitchen header must have two leading headers: Day, Task
   const kHead = kitchenScheduleTable.createTHead();
   const kHeadRow = kHead.insertRow();
   kHeadRow.insertCell().textContent = "Day";
   kHeadRow.insertCell().textContent = "Task";
-  peopleList.forEach(p=>kHeadRow.insertCell().textContent = p.name);
-
+  peopleList.forEach(p => kHeadRow.insertCell().textContent = p.name);
   const kBody = kitchenScheduleTable.createTBody();
-  // map day-subtask => row element for direct access
-  const kDayRows = {};
 
-  // create work header
+  // work header
   const wHead = workScheduleTable.createTHead();
   const wHeadRow = wHead.insertRow();
   wHeadRow.insertCell().textContent = "Day";
-  peopleList.forEach(p=>wHeadRow.insertCell().textContent = p.name);
+  peopleList.forEach(p => wHeadRow.insertCell().textContent = p.name);
   const wBody = workScheduleTable.createTBody();
+
+  // map rows for quick access
+  const kDayRows = {};
   const wDayRows = {};
 
-  // tracking for fairness (combined)
+  // tracking for fairness across kitchen + work
   const totalAssignments = {};
   const taskHistory = {};
   peopleList.forEach(p=>{
-    totalAssignments[p.name]=0;
-    taskHistory[p.name]=new Set();
+    totalAssignments[p.name] = 0;
+    taskHistory[p.name] = new Set();
   });
 
-  // Build empty rows for kitchen and work (so indices align)
+  // build blank rows aligned with headers
   days.forEach(day=>{
     kitchenSubTasks.forEach((sub, idx)=>{
       const row = kBody.insertRow();
-      if(idx===0){
+      if(idx === 0){
         const dayCell = row.insertCell();
         dayCell.textContent = day;
         dayCell.rowSpan = kitchenSubTasks.length;
       } else {
-        row.insertCell(); // placeholder for day column
+        // placeholder cell for Day column (empty)
+        row.insertCell();
       }
-      row.insertCell().textContent = sub; // Task (subtask) cell
-      // create a cell per person
+      // Task cell (always index 1)
+      const taskCell = row.insertCell();
+      taskCell.textContent = sub;
+      // person cells start at index 2
       peopleList.forEach(()=>row.insertCell());
       kDayRows[`${day}-${sub}`] = row;
     });
 
-    // work row
+    // work row per day
     const wRow = wBody.insertRow();
     wRow.insertCell().textContent = day;
     peopleList.forEach(()=>wRow.insertCell());
     wDayRows[day] = wRow;
   });
 
-  // helper: find kitchen task entries that correspond to given subtask name
-  function kitchenTaskEntriesForSubtask(sub){
+  // helper: find kitchen tasks whose name equals a subtask
+  function kitchenTasksForSubtask(sub){
     return kitchenTasks.filter(t=>t.name === sub);
   }
 
-  // combine kitchen + work into per-day assignments but handle kitchen subtasks per-subtask
+  // Combine: assign kitchen-subtasks first, then work tasks (both balanced together)
   days.forEach(day=>{
-    // Assign kitchen subtasks (for each subtask, check matching kitchenTasks that are enabled that day)
+    // KITCHEN: for each subtask row (Breakfast, Lunch, ...)
     kitchenSubTasks.forEach(sub=>{
-      const entries = kitchenTaskEntriesForSubtask(sub).filter(t=>t.days[day]);
-      // If user didn't create an explicit kitchenTask matching this sub, skip
-      if(entries.length===0) return;
+      const entries = kitchenTasksForSubtask(sub).filter(t=>t.days[day]);
+      if(entries.length === 0) return; // no user-defined kitchen task for this sub
 
-      // For each matching entry (there could be multiple with same name), assign count people
       entries.forEach(task=>{
-        // available persons for this subtask on this day
+        // available people for this kitchen task/subtask
         let available = peopleList.filter(p=>{
-          // ensure availability structure exists
-          if(!availability[p.name]) return false;
-          if(!availability[p.name][day]) return false;
-          // if availability for this specific subtask exists, use it; otherwise fall back to Work Duty
-          const ok = availability[p.name][day][task.name] === undefined ? !!availability[p.name][day]["Work Duty"] : !!availability[p.name][day][task.name];
-          return ok;
+          if(!availability[p.name] || !availability[p.name][day]) return false;
+          // prefer specific subtask availability if present, otherwise fall back to Work Duty
+          const subOk = availability[p.name][day][task.name];
+          const fallback = availability[p.name][day]["Work Duty"];
+          return (subOk === undefined ? !!fallback : !!subOk);
         });
 
-        if(available.length===0) return;
-
+        if(available.length === 0) return;
         shuffle(available);
 
         for(let i=0;i<task.count;i++){
-          // sort by least total assignments
-          available.sort((a,b)=>totalAssignments[a.name]-totalAssignments[b.name]);
-          // prefer someone who hasn't had this exact task this week
+          available.sort((a,b)=> totalAssignments[a.name] - totalAssignments[b.name] );
+          // prefer someone who hasn't done this exact task this week
           let chosen = available.find(p=>!taskHistory[p.name].has(task.name)) || available[0];
           totalAssignments[chosen.name]++;
           taskHistory[chosen.name].add(task.name);
 
-          // write to the correct cell: row cells are [0:Day,1:Task,2:firstPerson,...]
+          // write into correct cell: for kitchen rows person cells start at index 2
           const row = kDayRows[`${day}-${sub}`];
           const personIdx = peopleList.findIndex(pl=>pl.name===chosen.name);
           const cellIndex = 2 + personIdx;
@@ -297,28 +324,31 @@ function generateSchedule(){
       });
     });
 
-    // Assign work tasks (regular workTasks entries)
+    // WORK: assign regular workTasks
     workTasks.forEach(task=>{
       if(!task.days[day]) return;
-      // available: check Lunch Dishes availability (as original logic) or Work Duty availability
+
       let available = peopleList.filter(p=>{
         if(!availability[p.name] || !availability[p.name][day]) return false;
-        return !!availability[p.name][day]["Lunch Dishes"] && (task.genderRequired==="Any" || p.gender===task.genderRequired);
+        // originally work tasks use Lunch Dishes availability; keep that behavior
+        const ok = !!availability[p.name][day]["Lunch Dishes"];
+        if(!ok) return false;
+        if(task.genderRequired && task.genderRequired !== "Any" && p.gender !== task.genderRequired) return false;
+        return true;
       });
 
-      if(available.length===0) return;
+      if(available.length === 0) return;
       shuffle(available);
 
       for(let i=0;i<task.count;i++){
-        available.sort((a,b)=>totalAssignments[a.name]-totalAssignments[b.name]);
+        available.sort((a,b)=> totalAssignments[a.name] - totalAssignments[b.name] );
         let chosen = available.find(p=>!taskHistory[p.name].has(task.name)) || available[0];
         totalAssignments[chosen.name]++;
         taskHistory[chosen.name].add(task.name);
 
-        // work row for this day
         const wRow = wDayRows[day];
         const personIdx = peopleList.findIndex(pl=>pl.name===chosen.name);
-        const cellIndex = 1 + personIdx; // work row cells: [0:day,1:firstPerson,...]
+        const cellIndex = 1 + personIdx; // work row: index 0 = day, index 1 = first person
         const cell = wRow.cells[cellIndex];
         if(cell){
           cell.textContent += (cell.textContent ? ", " : "") + task.name;
@@ -331,10 +361,10 @@ function generateSchedule(){
 
 // ====== Reset All Data Button ======
 const resetBtn = document.createElement("button");
-resetBtn.textContent="Reset All Data";
-resetBtn.style.backgroundColor="orange";
-resetBtn.style.marginTop="10px";
-resetBtn.onclick=()=>{
+resetBtn.textContent = "Reset All Data";
+resetBtn.style.backgroundColor = "orange";
+resetBtn.style.marginTop = "10px";
+resetBtn.onclick = ()=>{
   if(confirm("Are you sure you want to reset all data?")){
     localStorage.clear();
     location.reload();
@@ -342,8 +372,40 @@ resetBtn.onclick=()=>{
 };
 document.body.appendChild(resetBtn);
 
-// ====== Initial render of UI lists ======
+// ====== Initial renders ======
 renderPeople();
 renderAvailability();
-renderTasks(kitchenTasks,kitchenTaskTable);
-renderTasks(workTasks,workTaskTable);
+renderTasks(kitchenTasks, kitchenTaskTable);
+renderTasks(workTasks, workTaskTable);
+
+// ====== Dark Mode toggle (existing button) ======
+if(darkmodeBtn){
+  darkmodeBtn.addEventListener("click", ()=>document.body.classList.toggle("dark"));
+}
+
+// ====== CSV Download (optional) ======
+if(downloadBtn){
+  downloadBtn.addEventListener("click", ()=>{
+    function tableToCSV(table){
+      const rows = [];
+      for(let r=0; r<table.rows.length; r++){
+        const cells = table.rows[r].cells;
+        const cols = [];
+        for(let c=0; c<cells.length; c++){
+          cols.push('"' + (cells[c].textContent || "").replace(/"/g,'""') + '"');
+        }
+        rows.push(cols.join(","));
+      }
+      return rows.join("\n");
+    }
+    const kitchenCSV = tableToCSV(kitchenScheduleTable);
+    const workCSV = tableToCSV(workScheduleTable);
+    const blob = new Blob([kitchenCSV + "\n\n" + workCSV], {type: "text/csv"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "schedule.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}
