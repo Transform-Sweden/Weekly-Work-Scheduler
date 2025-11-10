@@ -97,8 +97,14 @@
 <table id="work-schedule-table" class="schedule-table"></table>
 </section>
 
+<section style="background:#fff8e1; border:2px solid #ffeb3b; border-radius:8px; padding:10px; margin-top:20px;">
+<h3 style="color:#ff6f00; margin:0 0 6px 0;">⚠️ Reset All Data</h3>
+<p style="margin:0 0 8px 0;">This will permanently clear all saved people, tasks and availability.</p>
+<button id="reset-all-btn" style="background:#ff9800; padding:6px 10px; border-radius:6px; border:none; color:white; cursor:pointer;">Reset All Data</button>
+</section>
+
 <script>
-// ==== Data ====
+// ===== Data =====
 let peopleList = JSON.parse(localStorage.getItem("peopleList"))||[];
 let kitchenTasks = JSON.parse(localStorage.getItem("kitchenTasks"))||[];
 let workTasks = JSON.parse(localStorage.getItem("workTasks"))||[];
@@ -106,9 +112,9 @@ let availability = JSON.parse(localStorage.getItem("availability"))||{};
 const days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const kitchenSubTasks=["Breakfast","Lunch","Lunch Dishes","Dinner","Dinner Dishes"];
 const allSlots=[...kitchenSubTasks,"Work Duty"];
-const slotEmoji={Breakfast:"🍳",Lunch:"☀️", "Lunch Dishes":"🍽️", Dinner:"🌙","Dinner Dishes":"🧼", "Work Duty":"💼"};
+const slotEmoji={Breakfast:"🍳",Lunch:"☀️","Lunch Dishes":"🍽️",Dinner:"🌙","Dinner Dishes":"🧼","Work Duty":"💼"};
 
-// ==== DOM ====
+// ===== DOM =====
 const personInput=document.getElementById("person-name");
 const personGender=document.getElementById("person-gender");
 const addPersonBtn=document.getElementById("add-person-btn");
@@ -131,7 +137,7 @@ const darkmodeBtn=document.getElementById("darkmode-btn");
 const kitchenScheduleTable=document.getElementById("kitchen-schedule-table");
 const workScheduleTable=document.getElementById("work-schedule-table");
 
-// ==== Utils ====
+// ===== Utils =====
 function saveData(){
   localStorage.setItem("peopleList",JSON.stringify(peopleList));
   localStorage.setItem("kitchenTasks",JSON.stringify(kitchenTasks));
@@ -144,18 +150,16 @@ function ensureAvailabilityStructure(){
     if(!availability[p.name]) availability[p.name]={};
     days.forEach(d=>{
       if(!availability[p.name][d]) availability[p.name][d]={};
-      allSlots.forEach(s=>{
-        if(availability[p.name][d][s]===undefined) availability[p.name][d][s]=true;
-      });
+      allSlots.forEach(s=>{if(availability[p.name][d][s]===undefined) availability[p.name][d][s]=true;});
     });
   });
 }
 
-// ==== People UI ====
+// ===== People UI =====
 addPersonBtn.addEventListener("click",()=>{
   const name=personInput.value.trim(), gender=personGender.value;
-  if(!name){alert("Name required"); return;}
-  if(peopleList.find(p=>p.name===name)){alert("Person exists"); return;}
+  if(!name){alert("Name required");return;}
+  if(peopleList.find(p=>p.name===name)){alert("Person exists");return;}
   peopleList.push({name,gender});
   saveData(); renderPeople(); renderAvailability(); personInput.value="";
 });
@@ -173,7 +177,7 @@ function renderPeople(){
   });
 }
 
-// ==== Tasks UI ====
+// ===== Tasks UI =====
 function renderTasks(arr,tbody){
   tbody.innerHTML="";
   arr.forEach((task,idx)=>{
@@ -213,14 +217,11 @@ addWorkTaskBtn.addEventListener("click",()=>{
   workTasks.push(taskObj); saveData(); renderTasks(workTasks,workTaskTable); workTaskInput.value=""; workTaskCount.value=1; workTaskGender.value="Any";
 });
 
-// ==== Availability UI ====
+// ===== Availability UI =====
 let modalEl=null;
 function renderAvailability(){
   ensureAvailabilityStructure();
-  // table header
-  const thead=availabilityTable.querySelector("thead");
-  thead.innerHTML=""; const hdrRow=thead.insertRow(); hdrRow.insertCell().textContent="Person"; days.forEach(d=>hdrRow.insertCell().textContent=d);
-  // tbody
+  const thead=availabilityTable.querySelector("thead"); thead.innerHTML=""; const hdrRow=thead.insertRow(); hdrRow.insertCell().textContent="Person"; days.forEach(d=>hdrRow.insertCell().textContent=d);
   availabilityTbody.innerHTML="";
   peopleList.forEach(person=>{
     const tr=document.createElement("tr");
@@ -234,15 +235,11 @@ function renderAvailability(){
     availabilityTbody.appendChild(tr);
   });
 }
-
 function openAvailabilityModal(personName,day,anchorCell){
   closeAvailabilityModal();
   modalEl=document.createElement("div"); modalEl.className="avail-modal";
-  modalEl.style.top=(anchorCell.offsetTop+anchorCell.offsetHeight)+"px";
-  modalEl.style.left=anchorCell.offsetLeft+"px";
-  // title
+  const rect=anchorCell.getBoundingClientRect(); const scrollTop=window.scrollY || document.documentElement.scrollTop; modalEl.style.top=(rect.bottom+scrollTop)+"px"; modalEl.style.left=(rect.left+window.scrollX)+"px";
   const title=document.createElement("div"); title.style.fontWeight="600"; title.style.marginBottom="6px"; title.textContent=`${personName} — ${day}`; modalEl.appendChild(title);
-  // checkboxes
   const form=document.createElement("div"); form.style.display="grid"; form.style.gridTemplateColumns="1fr 1fr"; form.style.gap="6px";
   allSlots.forEach(slot=>{
     const label=document.createElement("label");
@@ -250,34 +247,22 @@ function openAvailabilityModal(personName,day,anchorCell){
     const emojiSpan=document.createElement("span"); emojiSpan.textContent=slotEmoji[slot]||slot[0];
     const text=document.createElement("span"); text.textContent=slot; text.style.fontSize="13px";
     label.appendChild(cb); label.appendChild(emojiSpan); label.appendChild(text);
-    cb.onchange=()=>{
-      availability[personName][day][slot]=cb.checked;
-      if(slot==="Lunch Dishes") availability[personName][day]["Work Duty"]=cb.checked;
-      if(slot==="Work Duty") availability[personName][day]["Lunch Dishes"]=cb.checked;
-      saveData(); renderAvailability();
-    };
+    cb.onchange=()=>{ availability[personName][day][slot]=cb.checked; if(slot==="Lunch Dishes") availability[personName][day]["Work Duty"]=cb.checked; if(slot==="Work Duty") availability[personName][day]["Lunch Dishes"]=cb.checked; saveData(); renderAvailability();};
     form.appendChild(label);
   });
   modalEl.appendChild(form);
-  // buttons
   const btnRow=document.createElement("div"); btnRow.style.display="flex"; btnRow.style.justifyContent="flex-end"; btnRow.style.gap="8px"; btnRow.style.marginTop="8px";
   const doneBtn=document.createElement("button"); doneBtn.textContent="Done"; doneBtn.onclick=()=>{ saveData(); renderAvailability(); closeAvailabilityModal(); };
   const cancelBtn=document.createElement("button"); cancelBtn.textContent="Cancel"; cancelBtn.style.background="#ddd"; cancelBtn.onclick=()=>closeAvailabilityModal();
   btnRow.appendChild(doneBtn); btnRow.appendChild(cancelBtn); modalEl.appendChild(btnRow);
   document.body.appendChild(modalEl);
   setTimeout(()=>{ modalEl.classList.add("show"); },10);
-
-  // click outside close
   function onWindowClick(ev){ if(!modalEl) return; if(modalEl.contains(ev.target)) return; closeAvailabilityModal(); }
-  window.addEventListener("click", onWindowClick);
-  modalEl.dataset.listener=true;
-  modalEl._closeListener=onWindowClick;
+  window.addEventListener("click",onWindowClick); modalEl._closeListener=onWindowClick;
 }
-function closeAvailabilityModal(){
-  if(modalEl){ if(modalEl._closeListener) window.removeEventListener("click",modalEl._closeListener); modalEl.remove(); modalEl=null; }
-}
+function closeAvailabilityModal(){ if(modalEl){ if(modalEl._closeListener) window.removeEventListener("click",modalEl._closeListener); modalEl.remove(); modalEl=null; }}
 
-// ==== Schedule Generation ====
+// ===== Schedule Generation =====
 generateBtn.addEventListener("click",()=>generateSchedule());
 clearBtn.addEventListener("click",()=>{kitchenScheduleTable.innerHTML=""; workScheduleTable.innerHTML="";});
 function generateSchedule(){
@@ -285,14 +270,9 @@ function generateSchedule(){
   Object.keys(availability).forEach(name=>{if(!peopleList.find(p=>p.name===name)) delete availability[name];}); saveData();
   if(peopleList.length===0){ alert("Add people first."); return; }
 
-  // kitchen header
   const kHead=kitchenScheduleTable.createTHead(); const kHeadRow=kHead.insertRow(); kHeadRow.insertCell().textContent="Day"; kHeadRow.insertCell().textContent="Task";
   peopleList.forEach(p=>kHeadRow.insertCell().textContent=p.name);
   const kBody=kitchenScheduleTable.createTBody(); const kDayRows={};
-  days.forEach(day=>{ kitchenSubTasks.forEach((sub,idx)=>{ const row=kBody.insertRow(); if(idx===0){ const dayCell=row.insertCell(); dayCell.textContent=day; dayCell.rowSpan=kitchenSubTasks.length; } const taskCell=row.insertCell(); taskCell.textContent=sub; peopleList.forEach(()=>row.insertCell()); kDayRows[`${day}-${sub}`]=row;}); });
+  days.forEach(day=>{ kitchenSubTasks.forEach((sub,idx)=>{ const row=kBody.insertRow(); if(idx===0){ const dayCell=row.insertCell(); dayCell.textContent=day; dayCell.rowSpan=kitchenSubTasks.length; } const taskCell=row.insertCell(); taskCell.textContent=sub; peopleList.forEach(()=>row.insertCell()); kDayRows[`${day}-${sub}`]=row; }); });
 
-  // work header
-  const wHead=workScheduleTable.createTHead(); const wHeadRow=wHead.insertRow(); wHeadRow.insertCell().textContent="Day"; peopleList.forEach(p=>wHeadRow.insertCell().textContent=p.name);
-  const wBody=workScheduleTable.createTBody(); const wDayRows={}; days.forEach(day=>{ const row=wBody.insertRow(); row.insertCell().textContent=day; peopleList.forEach(()=>row.insertCell()); wDayRows[day]=row; });
-
-  const totalAssignments=Object.fromEntries(peopleList.map(p=>[
+  const wHead=workScheduleTable.createTHead(); const wHeadRow=wHead.insertRow();
