@@ -1,1 +1,706 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Weekly Work Scheduler</title><style>body{font-family:Arial,sans-serif;margin:20px auto;max-width:1200px;padding:0 10px;background-color:#f4f4f4;color:#333;transition:background .3s,color .3s}body.dark{background:#121212;color:#e0e0e0}h1,h2{text-align:left}input,select,button{margin:5px 0}section{background:white;padding:15px;margin-bottom:20px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);transition:background .3s,color .3s}body.dark section{background:#1f1f1f}table{width:100%;border-collapse:collapse;margin-top:10px;display:block;overflow-x:auto}th,td{border:1px solid #ddd;padding:8px;text-align:center;min-width:50px;transition:background .3s,color .3s}th{background:#f2f2f2}body.dark th{background:#2c2c2c}tbody tr:nth-child(even){background:#f9f9f9}body.dark tbody tr:nth-child(even){background:#1a1a1a}tbody tr:hover{background:#e6f7ff}body.dark tbody tr:hover{background:#333}button{padding:6px 12px;border-radius:4px;border:none;background:#007BFF;color:#fff;cursor:pointer;transition:background .2s}button:hover{background:#0056b3}.remove-btn{background:red;color:#fff;padding:3px 6px;border-radius:3px}.remove-btn:hover{background:darkred}.task-label{margin-right:5px}.schedule-table td.kitchen-task{background:#d1e7dd}.schedule-table td.work-task{background:#f8d7da}.avail-cell{min-width:80px;padding:6px;cursor:pointer}.fairness-box{margin-top:12px;padding:8px;border-radius:8px;background:#eef6ff}@media(max-width:768px){table{display:block;overflow-x:auto}}</style></head><body><h1>Weekly Work Scheduler</h1><section id="people-section"><h2>People</h2><div class="input-group"><input type="text" id="person-name" placeholder="Enter name"><select id="person-gender"><option value="Male">Male</option><option value="Female">Female</option></select><button id="add-person-btn">Add Person</button></div><ul id="people-list"></ul></section><section id="kitchen-section"><h2>Kitchen Tasks</h2><div class="input-group"><input type="text" id="kitchen-task-name" placeholder="Enter task"><input type="number" id="kitchen-task-count" placeholder="People needed" min="1" value="1"><button id="add-kitchen-task-btn">Add Task</button></div><table id="kitchen-task-table"><thead><tr><th>Task</th><th>People Needed</th><th>Days Needed</th><th>Remove</th></tr></thead><tbody></tbody></table></section><section id="work-section"><h2>Work Duties</h2><div class="input-group"><input type="text" id="work-task-name" placeholder="Enter task"><input type="number" id="work-task-count" placeholder="People needed" min="1" value="1"><select id="work-task-gender"><option value="Any">Any</option><option value="Male">Male</option><option value="Female">Female</option></select><button id="add-work-task-btn">Add Task</button></div><table id="work-task-table"><thead><tr><th>Task</th><th>People Needed</th><th>Days Needed</th><th>Remove</th></tr></thead><tbody></tbody></table></section><section id="availability-section"><h2>Availability</h2><table id="availability-table"><thead><tr><th>Person</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead><tbody></tbody></table><p style="font-size:13px;color:#666;margin-top:8px;">Click a cell to edit availability for that person/day (emoji = slot enabled).</p></section><div class="input-group"><button id="generate-btn">Generate Schedule</button><button id="clear-btn">Clear Schedule</button><button id="download-btn">Download CSV</button><button id="darkmode-btn">Toggle Dark Mode</button></div><section id="schedule-section"><h2>Generated Kitchen Schedule</h2><table id="kitchen-schedule-table" class="schedule-table"></table><h2>Generated Work Duties Schedule</h2><table id="work-schedule-table" class="schedule-table"></table><div id="fairness-summary" class="fairness-box" style="display:none;"><h3 style="margin:4px 0;">Fairness summary (assignments per person)</h3><div id="fairness-content"></div></div></section><script>let peopleList=JSON.parse(localStorage.getItem("peopleList"))||[],kitchenTasks=JSON.parse(localStorage.getItem("kitchenTasks"))||[],workTasks=JSON.parse(localStorage.getItem("workTasks"))||[],availability=JSON.parse(localStorage.getItem("availability"))||{};const days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],kitchenSubTasks=["Breakfast","Lunch","Lunch Dishes","Dinner","Dinner Dishes"],allSlots=[...kitchenSubTasks,"Work Duty"],personInput=document.getElementById("person-name"),personGender=document.getElementById("person-gender"),addPersonBtn=document.getElementById("add-person-btn"),peopleUl=document.getElementById("people-list"),kitchenTaskInput=document.getElementById("kitchen-task-name"),kitchenTaskCount=document.getElementById("kitchen-task-count"),addKitchenTaskBtn=document.getElementById("add-kitchen-task-btn"),kitchenTaskTable=document.getElementById("kitchen-task-table").querySelector("tbody"),workTaskInput=document.getElementById("work-task-name"),workTaskCount=document.getElementById("work-task-count"),workTaskGender=document.getElementById("work-task-gender"),addWorkTaskBtn=document.getElementById("add-work-task-btn"),workTaskTable=document.getElementById("work-task-table").querySelector("tbody"),availabilityTable=document.getElementById("availability-table"),availabilityTbody=availabilityTable.querySelector("tbody"),generateBtn=document.getElementById("generate-btn"),clearBtn=document.getElementById("clear-btn"),downloadBtn=document.getElementById("download-btn"),darkmodeBtn=document.getElementById("darkmode-btn"),kitchenScheduleTable=document.getElementById("kitchen-schedule-table"),workScheduleTable=document.getElementById("work-schedule-table"),fairnessSummaryBox=document.getElementById("fairness-summary"),fairnessContent=document.getElementById("fairness-content"),slotEmoji={Breakfast:"🍳",Lunch:"☀️",Lunch Dishes:"🍽️",Dinner:"🌙",Dinner Dishes:"🧼",Work Duty:"💼"};function saveData(){localStorage.setItem("peopleList",JSON.stringify(peopleList)),localStorage.setItem("kitchenTasks",JSON.stringify(kitchenTasks)),localStorage.setItem("workTasks",JSON.stringify(workTasks)),localStorage.setItem("availability",JSON.stringify(availability))}function shuffle(a){return a.sort(()=>Math.random()-.5)}function ensureAvailabilityStructure(){peopleList.forEach(p=>{availability[p.name]=availability[p.name]||{};days.forEach(d=>{availability[p.name][d]=availability[p.name][d]||{};allSlots.forEach(s=>{availability[p.name][d][s]===undefined&&(availability[p.name][d][s]=!0)})})})}addPersonBtn.addEventListener("click",()=>{const e=personInput.value.trim(),t=personGender.value;if(!e)return alert("Name required");if(peopleList.find(p=>p.name===e))return alert("Person already exists");peopleList.push({name:e,gender:t}),availability[e]=availability[e]||{},days.forEach(d=>{availability[e][d]=availability[e][d]||{};allSlots.forEach(s=>{availability[e][d][s]===undefined&&(availability[e][d][s]=!0)})}),saveData(),renderPeople(),renderAvailability(),personInput.value=""});function removePerson(e){if(!confirm(`Remove ${e}?`))return;const t=peopleList.findIndex(p=>p.name===e);t>-1&&(peopleList.splice(t,1),delete availability[e],saveData(),renderPeople(),renderAvailability())}function renderPeople(){peopleUl.innerHTML="",peopleList.forEach(e=>{const t=document.createElement("li");t.textContent=`${e.name} (${e.gender}) `;const n=document.createElement("button");n.textContent="Remove",n.className="remove-btn",n.onclick=()=>removePerson(e.name),t.appendChild(n),peopleUl.appendChild(t)})}function renderTasks(e,t){t.innerHTML="",e.forEach((n,r)=>{const l=document.createElement("tr"),i=document.createElement("td");i.textContent=n.name,l.appendChild(i);const o=document.createElement("td"),c=document.createElement("input");c.type="number",c.value=n.count,c.min=1,c.onchange=()=>{n.count=parseInt(c.value)||1,saveData()},o.appendChild(c),l.appendChild(o);const d=document.createElement("td");days.forEach(e=>{const t=document.createElement("label");t.className="task-label";const n=document.createElement("input");n.type="checkbox",n.checked=!!n.days&&!!n.days[e],n.onchange=()=>{n.days=n.days||{},n.days[e]=n.checked,saveData()},t.appendChild(n),t.appendChild(document.createTextNode(e[0])),d.appendChild(t)}),l.appendChild(d);const u=document.createElement("td"),f=document.createElement("button");f.textContent="Remove",f.className="remove-btn",f.onclick=()=>{e.splice(r,1),renderTasks(e,t),saveData()},u.appendChild(f),l.appendChild(u),t.appendChild(l)})}addKitchenTaskBtn.addEventListener("click",()=>{const e=kitchenTaskInput.value.trim(),t=parseInt(kitchenTaskCount.value)||1;if(!e)return alert("Task name required");const n={name:e,count:t,days:{}};days.forEach(e=>n.days[e]=!0),kitchenTasks.push(n),saveData(),renderTasks(kitchenTasks,kitchenTaskTable),kitchenTaskInput.value="",kitchenTaskCount.value=1}),addWorkTaskBtn.addEventListener("click",()=>{const e=workTaskInput.value.trim(),t=parseInt(workTaskCount.value)||1,n=workTaskGender.value;if(!e)return alert("Task name required");const r={name:e,count:t,days:{},genderRequired:n};days.forEach(e=>r.days[e]=!1),workTasks.push(r),saveData(),renderTasks(workTasks,workTaskTable),workTaskInput.value="",workTaskCount.value=1,workTaskGender.value="Any"}),renderAvailability=function(){ensureAvailabilityStructure();let e=availabilityTable.querySelector("thead");e||(e=document.createElement("thead"),availabilityTable.appendChild(e)),e.innerHTML="";const t=e.insertRow();t.insertCell().textContent="Person",days.forEach(e=>t.insertCell().textContent=e),availabilityTbody.innerHTML="",peopleList.forEach(n=>{const r=document.createElement("tr"),l=document.createElement("td");l.textContent=n.name,r.appendChild(l),days.forEach(e=>{const t=document.createElement("td");t.className="avail-cell",t.style.cursor="pointer",t.style.minWidth="80px",t.style.padding="6px",t.style.textAlign="center";const l=allSlots.filter(t=>!!availability[n.name][e][t]);t.innerHTML=l.map(t=>`<span title="${t}" style="margin:0 2px; font-size:16px;">${slotEmoji[t]||t[0]}</span>`).join(""),t.onclick=()=>openAvailabilityModal(n.name,e,t),r.appendChild(t)}),availabilityTbody.appendChild(r)})},ensureAvailabilityStructure(),renderPeople(),renderTasks(kitchenTasks,kitchenTaskTable),renderTasks(workTasks,workTaskTable),renderAvailability(),darkmodeBtn&&darkmodeBtn.addEventListener("click",()=>document.body.classList.toggle("dark"));(function(){const e=document.createElement("section");e.style.background="#fff8e1",e.style.border="2px solid #ffeb3b",e.style.borderRadius="8px",e.style.padding="10px",e.style.marginTop="20px",e.innerHTML='<h3 style="color:#ff6f00;margin:0 0 6px 0;">Reset All Data</h3><p style="margin:0 0 8px 0;">This will permanently clear all saved people, tasks and availability.</p><button id="reset-all-btn" style="background:#ff9800;padding:6px 10px;border-radius:6px;border:none;color:white;cursor:pointer;">Reset All Data</button>',document.body.appendChild(e),document.getElementById("reset-all-btn").addEventListener("click",function(){if(confirm("Are you sure you want to reset ALL saved data?")){localStorage.clear(),peopleList=[],kitchenTasks=[],workTasks=[],availability={},renderPeople(),renderTasks(kitchenTasks,kitchenTaskTable),renderTasks(workTasks,workTaskTable),renderAvailability(),kitchenScheduleTable.innerHTML="",workScheduleTable.innerHTML="",fairnessSummaryBox.style.display="none",alert("All data cleared.")}})})();</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Weekly Work Scheduler — Improved (Fixed)</title>
+  <style>
+    :root{
+      --bg:#f4f4f4; --card:#fff; --text:#222; --muted:#666; --accent:#007BFF;
+      --danger:#ff4d4f; --success:#198754;
+    }
+    body { font-family: Inter, Arial, sans-serif; margin:20px auto; max-width:1200px; padding:0 12px;
+      background:var(--bg); color:var(--text); transition:background .2s,color .2s;}
+    body.dark{ --bg:#0f0f10; --card:#161616; --text:#e6e6e6; --muted:#999; --accent:#4ea6ff; }
+    h1,h2{ margin:0 0 8px 0; }
+    section{ background:var(--card); padding:14px; margin-bottom:16px; border-radius:10px;
+      box-shadow:0 2px 10px rgba(0,0,0,0.06); }
+    .input-group{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    input[type="text"], input[type="number"], select{ padding:6px 8px; border-radius:6px; border:1px solid #ddd; min-width:140px; }
+    button{ padding:6px 10px; border-radius:6px; border:none; background:var(--accent); color:#fff; cursor:pointer; }
+    button.secondary{ background:#6c757d; }
+    button.danger{ background:var(--danger); }
+    button[disabled]{ opacity:.6; cursor:not-allowed; }
+    table{ width:100%; border-collapse:collapse; margin-top:10px; overflow-x:auto; display:block; }
+    th,td{ border:1px solid #e6e6e6; padding:8px; text-align:center; min-width:60px; }
+    th{ background:#f6f8fb; }
+    .remove-btn{ background:var(--danger); padding:4px 8px; border-radius:6px; }
+    .kitchen-task{ background:#d1e7dd; }
+    .work-task{ background:#f8d7da; }
+    .avail-cell{ min-width:80px; padding:6px; cursor:pointer; }
+    .fairness-box{ margin-top:12px; padding:8px; border-radius:8px; background:#eef6ff; }
+    @media (max-width:768px){ table{ display:block; overflow-x:auto; } }
+    /* modal */
+    .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.32); display:flex; align-items:flex-start; justify-content:center; z-index:9998; padding:20px; }
+    .modal{ background:var(--card); color:var(--text); border-radius:8px; padding:12px; max-width:420px; width:100%; box-shadow:0 10px 40px rgba(0,0,0,0.25); }
+    .sr-only{ position:absolute !important; left:-10000px; top:auto; width:1px; height:1px; overflow:hidden; }
+  </style>
+</head>
+<body>
+  <h1>Weekly Work Scheduler</h1>
+
+  <section id="people-section" aria-labelledby="people-h">
+    <h2 id="people-h">People</h2>
+    <div class="input-group" role="group" aria-label="Add person">
+      <label class="sr-only" for="person-name">Person name</label>
+      <input id="person-name" type="text" placeholder="Enter name" autocomplete="off" />
+      <label class="sr-only" for="person-gender">Gender</label>
+      <select id="person-gender" aria-label="Gender">
+        <option value="Male">Male</option><option value="Female">Female</option>
+      </select>
+      <button id="add-person-btn" type="button">Add Person</button>
+      <button id="export-json-btn" type="button" class="secondary">Export JSON</button>
+      <input id="import-json" type="file" accept=".json" style="display:none" />
+      <button id="import-json-btn" type="button" class="secondary">Import JSON</button>
+    </div>
+    <ul id="people-list" aria-live="polite" style="margin-top:8px;"></ul>
+  </section>
+
+  <section id="kitchen-section">
+    <h2>Kitchen Tasks</h2>
+    <div class="input-group">
+      <input type="text" id="kitchen-task-name" placeholder="Enter task (e.g. Breakfast)"/>
+      <input type="number" id="kitchen-task-count" placeholder="People needed" min="1" value="1"/>
+      <button id="add-kitchen-task-btn" type="button">Add Task</button>
+    </div>
+    <table id="kitchen-task-table" aria-label="Kitchen tasks table">
+      <thead>
+        <tr><th>Task</th><th>People Needed</th><th>Days Needed</th><th>Remove</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section id="work-section">
+    <h2>Work Duties</h2>
+    <div class="input-group">
+      <input id="work-task-name" type="text" placeholder="Enter task (e.g. Guard)"/>
+      <input id="work-task-count" type="number" placeholder="People needed" min="1" value="1"/>
+      <select id="work-task-gender"><option>Any</option><option>Male</option><option>Female</option></select>
+      <button id="add-work-task-btn" type="button">Add Task</button>
+    </div>
+    <table id="work-task-table" aria-label="Work tasks table">
+      <thead><tr><th>Task</th><th>People Needed</th><th>Days Needed</th><th>Remove</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section id="availability-section">
+    <h2>Availability</h2>
+    <table id="availability-table" aria-label="Availability grid">
+      <thead>
+        <tr><th>Person</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <p style="font-size:13px;color:var(--muted); margin-top:8px;">Click a cell to edit availability for that person/day (emoji = slot enabled).</p>
+  </section>
+
+  <div class="input-group" style="margin-bottom:12px;">
+    <button id="generate-btn" type="button">Generate Schedule</button>
+    <button id="clear-btn" type="button" class="secondary">Clear Schedule</button>
+    <button id="download-btn" type="button" class="secondary">Download CSV</button>
+    <button id="darkmode-btn" type="button" class="secondary">Toggle Dark Mode</button>
+  </div>
+
+  <section id="schedule-section">
+    <h2>Generated Kitchen Schedule</h2>
+    <div style="overflow:auto;"><table id="kitchen-schedule-table" class="schedule-table" aria-label="Kitchen schedule"></table></div>
+
+    <h2>Generated Work Duties Schedule</h2>
+    <div style="overflow:auto;"><table id="work-schedule-table" class="schedule-table" aria-label="Work schedule"></table></div>
+
+    <div id="fairness-summary" class="fairness-box" style="display:none;">
+      <h3 style="margin:4px 0;">Fairness summary (assignments per person)</h3>
+      <div id="fairness-content" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- Reset area -->
+  <section style="background:#fff8e1;border:2px solid #ffeb3b;">
+    <h3 style="color:#ff6f00; margin:0 0 6px 0;">⚠️ Reset All Data</h3>
+    <p style="margin:0 0 8px 0;">This will permanently clear all saved people, tasks and availability.</p>
+    <button id="reset-all-btn" type="button" class="danger">Reset All Data</button>
+  </section>
+
+  <!-- Modal container (in DOM for accessibility) -->
+  <div id="modal-container" aria-hidden="true"></div>
+
+  <script>
+    /* ===== Data + Defaults ===== */
+    const STORAGE_KEYS = { people: 'ws_people', kitchen: 'ws_kitchen', work: 'ws_work', availability: 'ws_avail', dark: 'ws_dark' };
+    let peopleList = JSON.parse(localStorage.getItem(STORAGE_KEYS.people) || '[]');
+    let kitchenTasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.kitchen) || '[]');
+    let workTasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.work) || '[]');
+    let availability = JSON.parse(localStorage.getItem(STORAGE_KEYS.availability) || '{}');
+
+    const days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+    const kitchenSubTasks = ["Breakfast","Lunch","Lunch Dishes","Dinner","Dinner Dishes"];
+    const allSlots = [...kitchenSubTasks, "Work Duty"];
+    const slotEmoji = { "Breakfast":"🍳","Lunch":"☀️","Lunch Dishes":"🍽️","Dinner":"🌙","Dinner Dishes":"🧼","Work Duty":"💼" };
+
+    /* ===== DOM references ===== */
+    const personInput = document.getElementById('person-name');
+    const personGender = document.getElementById('person-gender');
+    const addPersonBtn = document.getElementById('add-person-btn');
+    const peopleUl = document.getElementById('people-list');
+
+    const kitchenTaskInput = document.getElementById('kitchen-task-name');
+    const kitchenTaskCount = document.getElementById('kitchen-task-count');
+    const addKitchenTaskBtn = document.getElementById('add-kitchen-task-btn');
+    const kitchenTaskTable = document.getElementById('kitchen-task-table').querySelector('tbody');
+
+    const workTaskInput = document.getElementById('work-task-name');
+    const workTaskCount = document.getElementById('work-task-count');
+    const workTaskGender = document.getElementById('work-task-gender');
+    const addWorkTaskBtn = document.getElementById('add-work-task-btn');
+    const workTaskTable = document.getElementById('work-task-table').querySelector('tbody');
+
+    const availabilityTable = document.getElementById('availability-table');
+    const availabilityTbody = availabilityTable.querySelector('tbody');
+
+    const generateBtn = document.getElementById('generate-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const downloadBtn = document.getElementById('download-btn');
+    const darkmodeBtn = document.getElementById('darkmode-btn');
+
+    const kitchenScheduleTable = document.getElementById('kitchen-schedule-table');
+    const workScheduleTable = document.getElementById('work-schedule-table');
+
+    const fairnessSummaryBox = document.getElementById('fairness-summary');
+    const fairnessContent = document.getElementById('fairness-content');
+
+    const exportJsonBtn = document.getElementById('export-json-btn');
+    const importFileInput = document.getElementById('import-json');
+    const importJsonBtn = document.getElementById('import-json-btn');
+
+    const resetAllBtn = document.getElementById('reset-all-btn');
+    const modalContainer = document.getElementById('modal-container');
+
+    /* ===== Utilities ===== */
+    function saveData(){
+      localStorage.setItem(STORAGE_KEYS.people, JSON.stringify(peopleList));
+      localStorage.setItem(STORAGE_KEYS.kitchen, JSON.stringify(kitchenTasks));
+      localStorage.setItem(STORAGE_KEYS.work, JSON.stringify(workTasks));
+      localStorage.setItem(STORAGE_KEYS.availability, JSON.stringify(availability));
+    }
+
+    function setDarkMode(enabled){
+      document.body.classList.toggle('dark', !!enabled);
+      localStorage.setItem(STORAGE_KEYS.dark, enabled ? '1' : '0');
+    }
+    // init dark mode
+    setDarkMode(localStorage.getItem(STORAGE_KEYS.dark) === '1');
+
+    // Fisher-Yates shuffle (unbiased)
+    function shuffle(arr){
+      const a = arr.slice();
+      for(let i=a.length-1;i>0;i--){
+        const j = Math.floor(Math.random()*(i+1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    // ensure availability structure
+    function ensureAvailabilityStructure(){
+      peopleList.forEach(p=>{
+        if(!availability[p.name]) availability[p.name] = {};
+        days.forEach(d=>{
+          if(!availability[p.name][d]) availability[p.name][d] = {};
+          allSlots.forEach(s=>{
+            if(availability[p.name][d][s] === undefined) availability[p.name][d][s] = true;
+          });
+        });
+      });
+      // remove entries for removed people
+      Object.keys(availability).forEach(name => {
+        if(!peopleList.find(p=>p.name===name)) delete availability[name];
+      });
+    }
+
+    /* ===== Renderers ===== */
+    function renderPeople(){
+      peopleUl.innerHTML = '';
+      peopleList.forEach((p, idx)=>{
+        const li = document.createElement('li');
+        li.textContent = `${p.name} (${p.gender}) `;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'remove-btn';
+        btn.textContent = 'Remove';
+        btn.style.marginLeft = '8px';
+        btn.addEventListener('click', ()=>{
+          if(!confirm(`Remove ${p.name}?`)) return;
+          peopleList.splice(idx,1);
+          saveData();
+          ensureAvailabilityStructure();
+          renderPeople();
+          renderAvailability();
+        });
+        li.appendChild(btn);
+        peopleUl.appendChild(li);
+      });
+    }
+
+    function renderTasks(taskArray, tbody){
+      tbody.innerHTML = '';
+      taskArray.forEach((task, idx)=>{
+        const tr = document.createElement('tr');
+        const nameTd = document.createElement('td'); nameTd.textContent = task.name; tr.appendChild(nameTd);
+
+        const countTd = document.createElement('td');
+        const countInput = document.createElement('input');
+        countInput.type='number'; countInput.min=1; countInput.value = task.count || 1;
+        countInput.addEventListener('change', ()=>{ task.count = Math.max(1, parseInt(countInput.value)||1); saveData(); });
+        countTd.appendChild(countInput); tr.appendChild(countTd);
+
+        const daysTd = document.createElement('td');
+        days.forEach(d=>{
+          const label = document.createElement('label');
+          label.style.marginRight='6px';
+          const cb = document.createElement('input');
+          cb.type='checkbox'; cb.checked = !!(task.days && task.days[d]);
+          cb.addEventListener('change', ()=>{
+            task.days = task.days || {};
+            task.days[d] = cb.checked;
+            saveData();
+          });
+          label.appendChild(cb); label.appendChild(document.createTextNode(' '+d[0]));
+          daysTd.appendChild(label);
+        });
+        tr.appendChild(daysTd);
+
+        const removeTd = document.createElement('td');
+        const btn = document.createElement('button'); btn.type='button'; btn.className='remove-btn'; btn.textContent='Remove';
+        btn.addEventListener('click', ()=>{ taskArray.splice(idx,1); saveData(); renderTasks(taskArray, tbody); });
+        removeTd.appendChild(btn); tr.appendChild(removeTd);
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    // availability grid
+    function renderAvailability(){
+      ensureAvailabilityStructure();
+      availabilityTbody.innerHTML = '';
+      peopleList.forEach(person=>{
+        const tr = document.createElement('tr');
+        const nameCell = document.createElement('td'); nameCell.textContent = person.name; tr.appendChild(nameCell);
+        days.forEach(day=>{
+          const td = document.createElement('td');
+          td.className = 'avail-cell';
+          td.tabIndex = 0;
+          // inline icons
+          const slots = allSlots.filter(s => !!availability[person.name][day][s]);
+          td.innerHTML = slots.map(s => `<span title="${s}" style="margin:0 2px; font-size:16px;">${slotEmoji[s]||s[0]}</span>`).join('');
+          td.addEventListener('click', ()=> openAvailabilityModal(person.name, day, td));
+          td.addEventListener('keydown', (ev)=>{ if(ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openAvailabilityModal(person.name, day, td); } });
+          tr.appendChild(td);
+        });
+        availabilityTbody.appendChild(tr);
+      });
+    }
+
+    /* ===== Modal (availability editor) ===== */
+    let activeModal = null;
+    let lastFocusedElement = null;
+
+    function openAvailabilityModal(personName, day, anchorCell){
+      closeModal(); // close previous
+
+      lastFocusedElement = document.activeElement;
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      backdrop.tabIndex = -1;
+
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.setAttribute('role','dialog');
+      modal.setAttribute('aria-modal','true');
+      modal.setAttribute('aria-label', `${personName} ${day} availability`);
+      modal.innerHTML = `<div style="font-weight:600;margin-bottom:8px;">${personName} — ${day}</div>`;
+      const form = document.createElement('div');
+      form.style.display='grid';
+      form.style.gridTemplateColumns='1fr 1fr';
+      form.style.gap='6px';
+
+      allSlots.forEach(slot=>{
+        const label = document.createElement('label');
+        label.style.display='flex'; label.style.alignItems='center'; label.style.gap='8px';
+        const cb = document.createElement('input');
+        cb.type='checkbox';
+        cb.dataset.slot = slot;
+        cb.checked = !!availability[personName][day][slot];
+        const emojiSpan = document.createElement('span'); emojiSpan.textContent = slotEmoji[slot] || slot[0];
+        const text = document.createElement('span'); text.textContent = slot; text.style.fontSize='13px';
+        label.appendChild(cb); label.appendChild(emojiSpan); label.appendChild(text);
+        form.appendChild(label);
+      });
+
+      modal.appendChild(form);
+
+      const btnRow = document.createElement('div');
+      btnRow.style.display='flex'; btnRow.style.justifyContent='flex-end'; btnRow.style.marginTop='10px'; btnRow.style.gap='8px';
+
+      const doneBtn = document.createElement('button'); doneBtn.type='button'; doneBtn.textContent='Done';
+      doneBtn.addEventListener('click', ()=> {
+        // persist changes from checkboxes in modal
+        const cbs = form.querySelectorAll('input[type=checkbox]');
+        cbs.forEach(cb => {
+          const s = cb.dataset.slot;
+          availability[personName][day][s] = cb.checked;
+        });
+        // enforce symmetric linking: Lunch Dishes <-> Work Duty: both on if either on, else both off
+        const ld = !!availability[personName][day]['Lunch Dishes'];
+        const wd = !!availability[personName][day]['Work Duty'];
+        const both = ld || wd;
+        availability[personName][day]['Lunch Dishes'] = both;
+        availability[personName][day]['Work Duty'] = both;
+
+        saveData();
+        renderAvailability();
+        closeModal();
+      });
+
+      const cancelBtn = document.createElement('button'); cancelBtn.type='button'; cancelBtn.textContent='Cancel';
+      cancelBtn.className='secondary';
+      cancelBtn.addEventListener('click', ()=> closeModal());
+
+      btnRow.appendChild(cancelBtn); btnRow.appendChild(doneBtn);
+      modal.appendChild(btnRow);
+
+      backdrop.appendChild(modal);
+      modalContainer.appendChild(backdrop);
+      modalContainer.setAttribute('aria-hidden','false');
+
+      // focus management
+      activeModal = backdrop;
+      setTimeout(()=> {
+        const firstInput = modal.querySelector('input[type=checkbox]');
+        if(firstInput) firstInput.focus();
+      }, 20);
+
+      // close when clicking backdrop (but not when clicking inside modal)
+      backdrop.addEventListener('click', (ev) => {
+        if(ev.target === backdrop) closeModal();
+      });
+      // escape key
+      function onKey(ev){
+        if(ev.key === 'Escape') closeModal();
+      }
+      document.addEventListener('keydown', onKey);
+
+      // store cleanup closure
+      backdrop._cleanup = ()=>{ document.removeEventListener('keydown', onKey); };
+    }
+
+    function closeModal(){
+      if(activeModal){
+        try{ if(activeModal._cleanup) activeModal._cleanup(); }catch(e){}
+        activeModal.remove();
+        activeModal = null;
+        modalContainer.setAttribute('aria-hidden','true');
+        if(lastFocusedElement) lastFocusedElement.focus();
+        lastFocusedElement = null;
+      }
+    }
+
+    /* ===== Event wiring (adders) ===== */
+    addPersonBtn.addEventListener('click', ()=>{
+      const name = personInput.value.trim();
+      const gender = personGender.value;
+      if(!name) return alert('Name required');
+      if(peopleList.find(p=>p.name === name)) return alert('Person already exists');
+      peopleList.push({ name, gender });
+      // init availability
+      availability[name] = availability[name] || {};
+      days.forEach(d=> { availability[name][d] = availability[name][d] || {}; allSlots.forEach(s=>{ if(availability[name][d][s] === undefined) availability[name][d][s]=true; }); });
+      saveData();
+      renderPeople(); renderAvailability();
+      personInput.value = '';
+    });
+
+    addKitchenTaskBtn.addEventListener('click', ()=>{
+      const name = kitchenTaskInput.value.trim();
+      const count = Math.max(1, parseInt(kitchenTaskCount.value) || 1);
+      if(!name) return alert('Task name required');
+      const task = { name, count, days: {} };
+      // default: all days checked for kitchen tasks
+      days.forEach(d => task.days[d] = true);
+      kitchenTasks.push(task);
+      saveData();
+      renderTasks(kitchenTasks, kitchenTaskTable);
+      kitchenTaskInput.value=''; kitchenTaskCount.value=1;
+    });
+
+    addWorkTaskBtn.addEventListener('click', ()=>{
+      const name = workTaskInput.value.trim();
+      const count = Math.max(1, parseInt(workTaskCount.value) || 1);
+      const genderReq = workTaskGender.value;
+      if(!name) return alert('Task name required');
+      const task = { name, count, days: {} , genderRequired: genderReq};
+      // default: no days checked (user chooses)
+      days.forEach(d=>task.days[d]=false);
+      workTasks.push(task);
+      saveData();
+      renderTasks(workTasks, workTaskTable);
+      workTaskInput.value=''; workTaskCount.value=1; workTaskGender.value='Any';
+    });
+
+    /* ===== Generator with improved fairness and safety ===== */
+    generateBtn.addEventListener('click', generateSchedule);
+    clearBtn.addEventListener('click', ()=>{ kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessSummaryBox.style.display='none'; });
+
+    function generateSchedule(){
+      kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessContent.innerHTML=''; fairnessSummaryBox.style.display='none';
+      ensureAvailabilityStructure();
+      saveData();
+      if(peopleList.length === 0) { alert('Add people first.'); return; }
+
+      // build kitchen table
+      const kHead = kitchenScheduleTable.createTHead();
+      const kHeadRow = kHead.insertRow();
+      kHeadRow.insertCell().textContent = 'Day';
+      kHeadRow.insertCell().textContent = 'Slot';
+      peopleList.forEach(p => kHeadRow.insertCell().textContent = p.name);
+      const kBody = kitchenScheduleTable.createTBody();
+      const kRows = {};
+      days.forEach(day=>{
+        kitchenSubTasks.forEach((sub, idx)=>{
+          const row = kBody.insertRow();
+          if(idx === 0){ const cell = row.insertCell(); cell.textContent = day; cell.rowSpan = kitchenSubTasks.length; }
+          row.insertCell().textContent = sub;
+          peopleList.forEach(()=> row.insertCell());
+          kRows[`${day}-${sub}`] = row;
+        });
+      });
+
+      // build work table
+      const wHead = workScheduleTable.createTHead();
+      const wHeadRow = wHead.insertRow();
+      wHeadRow.insertCell().textContent = 'Day';
+      peopleList.forEach(p => wHeadRow.insertCell().textContent = p.name);
+      const wBody = workScheduleTable.createTBody();
+      const wRows = {};
+      days.forEach(day=>{
+        const row = wBody.insertRow();
+        row.insertCell().textContent = day;
+        peopleList.forEach(()=> row.insertCell());
+        wRows[day] = row;
+      });
+
+      // fairness trackers
+      const totalAssignments = Object.fromEntries(peopleList.map(p=>[p.name,0]));
+      const dailyAssignedKitchen = Object.fromEntries(days.map(d=>[d,new Set()]));
+      const dailyAssignedWork = Object.fromEntries(days.map(d=>[d,new Set()]));
+      const lastWorkDay = Object.fromEntries(peopleList.map(p=>[p.name, null]));
+
+      const dayIndex = d => days.indexOf(d);
+
+      // helper: attempt to assign one slot using candidate list and fairness (with small random tie-break)
+      function pickCandidate(candidates){
+        if(!candidates || candidates.length === 0) return null;
+        return candidates
+          .map(p => ({ p, score: totalAssignments[p.name] + Math.random() * 0.01 }))
+          .sort((a,b)=> a.score - b.score)[0].p;
+      }
+
+      // assign kitchen slots
+      days.forEach(day=>{
+        kitchenSubTasks.forEach(sub=>{
+          // find tasks matching this kitchen sub AND enabled for the day
+          const matching = kitchenTasks.filter(t => t.name === sub && t.days && t.days[day]);
+          if(matching.length === 0) return;
+          matching.forEach(task=>{
+            for(let s=0;s<task.count;s++){
+              // eligible: available for this sub and not already assigned any kitchen subtask today
+              let eligible = peopleList.filter(p=>{
+                const personAvail = availability[p.name] && availability[p.name][day];
+                if(!personAvail) return false;
+                if(!personAvail[sub]) return false;
+                if(dailyAssignedKitchen[day].has(p.name)) return false; // avoid >1 kitchen/day
+                return true;
+              });
+
+              // relax constraint if none (but still avoid those already assigned kitchen today)
+              if(eligible.length === 0){
+                eligible = peopleList.filter(p => availability[p.name] && availability[p.name][day] && availability[p.name][day][sub] && !dailyAssignedKitchen[day].has(p.name));
+              }
+              if(eligible.length === 0) eligible = peopleList.filter(p => !dailyAssignedKitchen[day].has(p.name));
+              if(eligible.length === 0) eligible = peopleList.slice();
+
+              const chosen = pickCandidate(eligible);
+              if(!chosen) continue;
+              totalAssignments[chosen.name] += 1;
+              dailyAssignedKitchen[day].add(chosen.name);
+
+              // write to cell
+              const row = kRows[`${day}-${sub}`];
+              const idx = peopleList.findIndex(pl => pl.name === chosen.name);
+              const cell = row.cells[2 + idx];
+              if(cell){
+                cell.textContent = (cell.textContent ? cell.textContent + ', ' : '') + '✓';
+                cell.className = 'kitchen-task';
+              }
+            }
+          });
+        });
+
+        // work tasks for this day
+        workTasks.forEach(task=>{
+          if(!task.days || !task.days[day]) return;
+          // build available list (strict)
+          let available = peopleList.filter(p=>{
+            const personAvail = availability[p.name] && availability[p.name][day];
+            if(!personAvail) return false;
+            if(!personAvail['Work Duty']) return false;
+            // not assigned Lunch Dishes this day
+            const lunchRow = kRows[`${day}-Lunch Dishes`];
+            if(lunchRow){
+              const pi = peopleList.findIndex(pl=>pl.name===p.name);
+              const c = lunchRow.cells[2 + pi];
+              if(c && c.textContent && c.textContent.includes('✓')) return false;
+            }
+            if(task.genderRequired && task.genderRequired !== 'Any' && p.gender !== task.genderRequired) return false;
+            // avoid consecutive work days if possible
+            const yIdx = dayIndex(day) - 1;
+            if(yIdx >= 0){
+              const yesterday = days[yIdx];
+              if(lastWorkDay[p.name] === yesterday) return false;
+            }
+            // avoid multiple work tasks same day
+            if(dailyAssignedWork[day].has(p.name)) return false;
+            return true;
+          });
+
+          if(available.length === 0){
+            // relax consecutive-day rule / other constraints but still respect gender and availability
+            available = peopleList.filter(p=>{
+              const personAvail = availability[p.name] && availability[p.name][day];
+              if(!personAvail) return false;
+              if(!personAvail['Work Duty']) return false;
+              if(task.genderRequired && task.genderRequired !== 'Any' && p.gender !== task.genderRequired) return false;
+              if(dailyAssignedWork[day].has(p.name)) return false;
+              return true;
+            });
+          }
+          if(available.length === 0) return;
+
+          // pick 'count' distinct people if possible
+          const shuffled = shuffle(available);
+          shuffled.sort((a,b)=> totalAssignments[a.name] - totalAssignments[b.name]);
+          for(let i=0;i<task.count;i++){
+            const chosen = shuffled[i] || shuffled[0];
+            if(!chosen) continue;
+            totalAssignments[chosen.name] += 1;
+            lastWorkDay[chosen.name] = day;
+            dailyAssignedWork[day].add(chosen.name);
+
+            const wRow = wRows[day];
+            const personIdx = peopleList.findIndex(pl=>pl.name === chosen.name);
+            const cell = wRow.cells[1 + personIdx];
+            if(cell){
+              cell.textContent = (cell.textContent ? cell.textContent + ', ' : '') + task.name;
+              cell.className = 'work-task';
+            }
+          }
+        });
+      });
+
+      // fairness UI
+      const rows = Object.entries(totalAssignments).sort((a,b)=>b[1]-a[1]);
+      fairnessContent.innerHTML = rows.map(([name,count]) => `<div style="display:flex;justify-content:space-between;padding:2px 0;"><strong>${name}</strong><span>${count}</span></div>`).join('');
+      fairnessSummaryBox.style.display = 'block';
+    }
+
+    /* ===== Download CSV (improved) ===== */
+    downloadBtn.addEventListener('click', ()=>{
+      function tableToCSV(table){
+        if(!table || !table.rows || table.rows.length===0) return '';
+        const lines=[];
+        for(let r=0;r<table.rows.length;r++){
+          const cells = table.rows[r].cells;
+          const row=[];
+          for(let c=0;c<cells.length;c++){
+            row.push('"' + (cells[c].textContent || '').replace(/"/g,'""') + '"');
+          }
+          lines.push(row.join(','));
+        }
+        return lines.join('\n');
+      }
+      const kitchenCSV = tableToCSV(kitchenScheduleTable);
+      const workCSV = tableToCSV(workScheduleTable);
+      const fairnessText = Array.from(document.querySelectorAll('#fairness-content div')).map(d => d.textContent).join('\n');
+      const blob = new Blob([ 'Kitchen Schedule\n', kitchenCSV, '\n\nWork Schedule\n', workCSV, '\n\nFairness Summary\n', fairnessText ], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'schedule.csv'; a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    /* ===== JSON import/export ===== */
+    exportJsonBtn.addEventListener('click', ()=>{
+      const payload = { peopleList, kitchenTasks, workTasks, availability, meta: { exportedAt: new Date().toISOString() } };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'scheduler-export.json'; a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    importFileInput.addEventListener('change', (ev)=>{
+      const f = ev.target.files[0];
+      if(!f) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try{
+          const obj = JSON.parse(e.target.result);
+          if(!confirm('Importing will replace current data. Continue?')) return;
+          peopleList = obj.peopleList || [];
+          kitchenTasks = obj.kitchenTasks || [];
+          workTasks = obj.workTasks || [];
+          availability = obj.availability || {};
+          saveData();
+          ensureAvailabilityStructure();
+          renderPeople(); renderTasks(kitchenTasks,kitchenTaskTable); renderTasks(workTasks,workTaskTable); renderAvailability();
+          alert('Import completed');
+        }catch(err){
+          alert('Invalid JSON file');
+        }
+      };
+      reader.readAsText(f);
+      // clear input for future imports
+      ev.target.value = '';
+    });
+    importJsonBtn.addEventListener('click', ()=> importFileInput.click());
+
+    /* ===== Dark mode toggle ===== */
+    darkmodeBtn.addEventListener('click', ()=> {
+      const next = !document.body.classList.contains('dark');
+      setDarkMode(next);
+    });
+
+    /* ===== Reset ===== */
+    resetAllBtn.addEventListener('click', ()=>{
+      if(!confirm('Are you sure you want to reset ALL saved data?')) return;
+      localStorage.removeItem(STORAGE_KEYS.people); localStorage.removeItem(STORAGE_KEYS.kitchen);
+      localStorage.removeItem(STORAGE_KEYS.work); localStorage.removeItem(STORAGE_KEYS.availability);
+      // preserve dark mode intentionally to avoid surprising the user; remove if full reset desired
+      peopleList = []; kitchenTasks = []; workTasks = []; availability = {};
+      renderPeople(); renderTasks(kitchenTasks,kitchenTaskTable); renderTasks(workTasks,workTaskTable); renderAvailability();
+      kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessSummaryBox.style.display='none';
+      alert('All data cleared.');
+    });
+
+    /* ===== Initial render ===== */
+    ensureAvailabilityStructure();
+    renderPeople();
+    renderTasks(kitchenTasks, kitchenTaskTable);
+    renderTasks(workTasks, workTaskTable);
+    renderAvailability();
+
+    // small UX: set button types on existing elements to avoid accidental submits
+    document.querySelectorAll('button').forEach(b => { if(!b.type) b.type='button'; });
+
+  </script>
+</body>
+</html>
