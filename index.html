@@ -636,7 +636,7 @@
         });
       });
 
-      // fairness UI
+      // fairness UI — single-line template to avoid accidental newline-in-single-quote errors
       const rows = Object.entries(totalAssignments).sort((a,b)=>b[1]-a[1]);
       fairnessContent.innerHTML = rows.map(([name,count]) => `<div style="display:flex;justify-content:space-between;padding:2px 0;"><strong>${name}</strong><span>${count}</span></div>`).join('');
       fairnessSummaryBox.style.display = 'block';
@@ -655,21 +655,12 @@
           }
           lines.push(row.join(','));
         }
-        return lines.join('
-');
+        return lines.join('\n');
       }
       const kitchenCSV = tableToCSV(kitchenScheduleTable);
       const workCSV = tableToCSV(workScheduleTable);
-      const fairnessText = Array.from(document.querySelectorAll('#fairness-content div')).map(d => d.textContent).join('
-');
-      const blob = new Blob([ '### Kitchen Schedule
-', kitchenCSV, '
-
-### Work Schedule
-', workCSV, '
-
-### Fairness Summary
-', fairnessText ], { type: 'text/csv' });
+      const fairnessText = Array.from(document.querySelectorAll('#fairness-content div')).map(d => d.textContent).join('\n');
+      const blob = new Blob([ '### Kitchen Schedule\n', kitchenCSV, '\n\n### Work Schedule\n', workCSV, '\n\n### Fairness Summary\n', fairnessText ], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = 'schedule.csv'; a.click();
       URL.revokeObjectURL(url);
