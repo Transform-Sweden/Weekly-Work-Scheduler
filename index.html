@@ -1,4 +1,5 @@
 <!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
@@ -21,7 +22,7 @@
     button.secondary{ background:#6c757d; }
     button.danger{ background:var(--danger); }
     button[disabled]{ opacity:.6; cursor:not-allowed; }
-    table{ width:100%; border-collapse:collapse; margin-top:10px; overflow-x:auto; display:block; }
+    table{ width:100%; border-collapse:collapse; margin-top:10px; }
     th,td{ border:1px solid #e6e6e6; padding:8px; text-align:center; min-width:60px; }
     th{ background:#f6f8fb; }
     .remove-btn{ background:transparent; border:1px solid transparent; color:var(--danger); padding:4px 8px; border-radius:6px; }
@@ -31,7 +32,7 @@
     .work-task{ background:#f8d7da; }
     .avail-cell{ min-width:80px; padding:6px; cursor:pointer; }
     .fairness-box{ margin-top:12px; padding:8px; border-radius:8px; background:#eef6ff; }
-    @media (max-width:768px){ table{ display:block; overflow-x:auto; } }
+    @media (max-width:768px){ .table-scroll{ overflow-x:auto; } }
     /* modal */
     .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.32); display:flex; align-items:flex-start; justify-content:center; z-index:9998; padding:20px; }
     .modal{ background:var(--card); color:var(--text); border-radius:8px; padding:12px; max-width:420px; width:100%; box-shadow:0 10px 40px rgba(0,0,0,0.25); }
@@ -81,7 +82,7 @@
       <input id="work-task-name" type="text" placeholder="Enter task (e.g. Guard)"/>
       <input id="work-task-count" type="number" placeholder="People needed" min="1" value="1"/>
       <select id="work-task-gender" aria-label="Gender required">
-        <option>Any</option><option>Male</option><option>Female</option><option>Non-binary</option>
+        <option>Any</option><option>Male</option><option>Female</option>
       </select>
       <button id="add-work-task-btn" type="button">Add Task</button>
     </div>
@@ -94,13 +95,15 @@
 
   <section id="availability-section">
     <h2>Availability</h2>
-    <table id="availability-table" aria-label="Availability grid">
-      <caption>Availability per person and day — click a cell to edit (emoji = slot enabled)</caption>
-      <thead>
-        <tr><th>Person</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <div class="table-scroll">
+      <table id="availability-table" aria-label="Availability grid">
+        <caption>Availability per person and day — click a cell to edit (emoji = slot enabled)</caption>
+        <thead>
+          <tr><th>Person</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
     <p style="font-size:13px;color:var(--muted); margin-top:8px;">Click a cell to edit availability for that person/day (emoji = slot enabled).</p>
   </section>
 
@@ -528,8 +531,17 @@
       // helper: return candidates sorted by (totalAssignments asc) with tie-breaker randomized
       function sortCandidatesByFairness(candidates){
         if(!candidates || candidates.length===0) return [];
+        const avg = Object.values(totalAssignments).reduce((a,b)=>a+b,0) / Math.max(1, peopleList.length);
         const shuffled = shuffle(candidates.slice()); // randomize order to break ties
-        shuffled.sort((a,b)=> totalAssignments[a.name] - totalAssignments[b.name]);
+        shuffled.sort((a,b)=>{
+          const ta = totalAssignments[a.name];
+          const tb = totalAssignments[b.name];
+          // prefer people below average slightly
+          const aScore = ta + (ta < avg ? -0.25 : 0);
+          const bScore = tb + (tb < avg ? -0.25 : 0);
+          if(aScore !== bScore) return aScore - bScore;
+          return Math.random() < 0.5 ? -1 : 1;
+        });
         return shuffled;
       }
 
@@ -618,11 +630,13 @@
           }
           if(available.length === 0) return;
 
-          // sort candidates by fairness and pick top `count` distinct people
+          // sort candidates by fairness and pick `count` distinct people
           const sorted = sortCandidatesByFairness(available);
+          const chosenSet = new Set();
           for(let i=0;i<task.count;i++){
-            const chosen = sorted[i] || sorted[0];
+            const chosen = sorted.find(c => !chosenSet.has(c.name)) || sorted[0];
             if(!chosen) continue;
+            chosenSet.add(chosen.name);
             totalAssignments[chosen.name] += 1;
             lastWorkDay[chosen.name] = day;
             dailyAssignedWork[day].add(chosen.name);
@@ -659,11 +673,13 @@
           }
           lines.push(row.join(','));
         }
-        return lines.join('\n');
+        return lines.join('
+');
       }
       const kitchenCSV = tableToCSV(kitchenScheduleTable);
       const workCSV = tableToCSV(workScheduleTable);
-      const fairnessText = Array.from(document.querySelectorAll('#fairness-content div')).map(d => d.textContent).join('\n');
+      const fairnessText = Array.from(document.querySelectorAll('#fairness-content div')).map(d => d.textContent).join('
+');
 
       // combine with clear heading rows (CSV-compatible)
       const combined = [
@@ -678,7 +694,8 @@
         '"Fairness Summary"',
         '',
         '"' + fairnessText.replace(/"/g,'""') + '"'
-      ].join('\n');
+      ].join('
+');
 
       const blob = new Blob([combined], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
