@@ -528,6 +528,15 @@
         return sorted.length ? sorted[0] : null;
       }
 
+      // helper to get correct person cell in a kitchen row (handles rowspan / missing Day cell)
+      function getKitchenPersonCell(row, personIdx){
+        // If row includes the Day cell + Slot cell + person columns, cells.length === 2 + peopleCount
+        // That means person columns start at index 2. Otherwise they start at 1.
+        const expectedWithDay = 2 + peopleList.length;
+        const base = (row.cells.length === expectedWithDay) ? 2 : 1;
+        return row.cells[base + personIdx];
+      }
+
       days.forEach(day=>{
         const lunchRow = kRows[`${day}-Lunch Dishes`];
 
@@ -559,7 +568,7 @@
 
               const row = kRows[`${day}-${sub}`];
               const idx = nameIndex[chosen.name];
-              const cell = row.cells[2 + idx];
+              const cell = getKitchenPersonCell(row, idx);
               if(cell){
                 cell.textContent = (cell.textContent ? cell.textContent + ', ' : '') + '✓';
                 cell.className = 'kitchen-task';
@@ -578,6 +587,8 @@
             if(!personAvail['Work Duty']) return false;
             if(lunchRow){
               const pi = nameIndex[p.name];
+              // lunchRow always has the Day cell when built (we inserted Day in first sub-row),
+              // so person columns for lunchRow are at index 2 + pi
               const c = lunchRow.cells[2 + pi];
               if(c && c.textContent && c.textContent.includes('✓')) return false;
             }
