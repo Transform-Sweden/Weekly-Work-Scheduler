@@ -1,747 +1,485 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Weekly Work Scheduler</title>
-  <style>
-    :root{
-      --bg:#f4f4f4; --card:#fff; --text:#222; --muted:#666; --accent:#007BFF;
-      --danger:#ff4d4f; --success:#198754;
-    }
-    body { font-family: Inter, Arial, sans-serif; margin:20px auto; max-width:1200px; padding:0 12px;
-      background:var(--bg); color:var(--text); transition:background .2s,color .2s;}
-    body.dark{ --bg:#0f0f10; --card:#161616; --text:#e6e6e6; --muted:#999; --accent:#4ea6ff; }
-    h1,h2{ margin:0 0 8px 0; }
-    section{ background:var(--card); padding:14px; margin-bottom:16px; border-radius:10px;
-      box-shadow:0 2px 10px rgba(0,0,0,0.06); }
-    .input-group{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-    input[type="text"], input[type="number"], select{ padding:6px 8px; border-radius:6px; border:1px solid #ddd; min-width:140px; }
-    button{ padding:6px 10px; border-radius:6px; border:none; background:var(--accent); color:#fff; cursor:pointer; }
-    button.secondary{ background:#6c757d; }
-    button.danger{ background:var(--danger); }
-    button[disabled]{ opacity:.6; cursor:not-allowed; }
-    table{ width:100%; border-collapse:collapse; margin-top:10px; }
-    th,td{ border:1px solid #e6e6e6; padding:8px; text-align:center; min-width:60px; }
-    th{ background:#f6f8fb; }
-    .remove-btn{ background:transparent; border:1px solid transparent; color:var(--danger); padding:4px 8px; border-radius:6px; }
-    .remove-btn:hover{ background:var(--danger); color:#fff; }
-    .person-list-item{ display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; border:1px solid #eee; margin-bottom:6px; justify-content:space-between; }
-    .kitchen-task{ background:#d1e7dd; }
-    .work-task{ background:#f8d7da; }
-    .avail-cell{ min-width:80px; padding:6px; cursor:pointer; }
-    .fairness-box{ margin-top:12px; padding:8px; border-radius:8px; background:#eef6ff; }
-    @media (max-width:768px){ .table-scroll{ overflow-x:auto; } }
-    /* modal */
-    .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.32); display:flex; align-items:flex-start; justify-content:center; z-index:9998; padding:20px; }
-    .modal{ background:var(--card); color:var(--text); border-radius:8px; padding:12px; max-width:420px; width:100%; box-shadow:0 10px 40px rgba(0,0,0,0.25); }
-    .sr-only{ position:absolute !important; left:-10000px; top:auto; width:1px; height:1px; overflow:hidden; }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Weekly Work Scheduler</title>
+<style>
+  :root{
+    --bg:#f4f4f4; --card:#fff; --text:#222; --muted:#666; --accent:#007BFF;
+    --danger:#ff4d4f; --success:#198754;
+  }
+  body { font-family: Inter, Arial, sans-serif; margin:20px auto; max-width:1200px; padding:0 12px;
+    background:var(--bg); color:var(--text); transition:background .2s,color .2s;}
+  body.dark{ --bg:#0f0f10; --card:#161616; --text:#e6e6e6; --muted:#999; --accent:#4ea6ff; }
+  h1,h2{ margin:0 0 8px 0; }
+  section{ background:var(--card); padding:14px; margin-bottom:16px; border-radius:10px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.06); }
+  .input-group{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  input[type="text"], input[type="number"], select{ padding:6px 8px; border-radius:6px; border:1px solid #ddd; min-width:140px; }
+  button{ padding:6px 10px; border-radius:6px; border:none; background:var(--accent); color:#fff; cursor:pointer; }
+  button.secondary{ background:#6c757d; }
+  button.danger{ background:var(--danger); }
+  button[disabled]{ opacity:.6; cursor:not-allowed; }
+  table{ width:100%; border-collapse:collapse; margin-top:10px; }
+  th,td{ border:1px solid #e6e6e6; padding:8px; text-align:center; min-width:60px; }
+  th{ background:#f6f8fb; }
+  .remove-btn{ background:transparent; border:1px solid transparent; color:var(--danger); padding:4px 8px; border-radius:6px; }
+  .remove-btn:hover{ background:var(--danger); color:#fff; }
+  .person-list-item{ display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; border:1px solid #eee; margin-bottom:6px; justify-content:space-between; }
+  .kitchen-task{ background:#d1e7dd; }
+  .work-task{ background:#f8d7da; }
+  .avail-cell{ min-width:80px; padding:6px; cursor:pointer; }
+  .fairness-box{ margin-top:12px; padding:8px; border-radius:8px; background:#eef6ff; }
+  @media (max-width:768px){ .table-scroll{ overflow-x:auto; } }
+  /* modal */
+  .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.32); display:flex; align-items:flex-start; justify-content:center; z-index:9998; padding:20px; }
+  .modal{ background:var(--card); color:var(--text); border-radius:8px; padding:12px; max-width:420px; width:100%; box-shadow:0 10px 40px rgba(0,0,0,0.25); }
+  .sr-only{ position:absolute !important; left:-10000px; top:auto; width:1px; height:1px; overflow:hidden; }
+</style>
 </head>
 <body>
-  <h1>Weekly Work Scheduler</h1>
+<h1>Weekly Work Scheduler</h1>
 
-  <section id="people-section" aria-labelledby="people-h">
-    <h2 id="people-h">People</h2>
-    <div class="input-group" role="group" aria-label="Add person">
-      <label for="person-name" class="sr-only">Person name</label>
-      <input id="person-name" type="text" placeholder="Enter name" autocomplete="off" />
-      <label for="person-gender" class="sr-only">Gender</label>
-      <select id="person-gender" aria-label="Gender">
-        <option value="Male">Male</option>
-        <option value="Female">Female</option>
-      </select>
-      <button id="add-person-btn" type="button">Add Person</button>
-      <button id="export-json-btn" type="button" class="secondary">Export JSON</button>
-      <input id="import-json" type="file" accept=".json" style="display:none" />
-      <button id="import-json-btn" type="button" class="secondary">Import JSON</button>
-    </div>
-    <div id="people-list" aria-live="polite" style="margin-top:8px;"></div>
-  </section>
+<section id="people-section" aria-labelledby="people-h">
+  <h2 id="people-h">People</h2>
+  <div class="input-group" role="group" aria-label="Add person">
+    <label for="person-name" class="sr-only">Person name</label>
+    <input id="person-name" type="text" placeholder="Enter name" autocomplete="off" />
+    <label for="person-gender" class="sr-only">Gender</label>
+    <select id="person-gender" aria-label="Gender">
+      <option value="Male">Male</option>
+      <option value="Female">Female</option>
+    </select>
+    <button id="add-person-btn" type="button">Add Person</button>
+    <button id="export-json-btn" type="button" class="secondary">Export JSON</button>
+    <input id="import-json" type="file" accept=".json" style="display:none" />
+    <button id="import-json-btn" type="button" class="secondary">Import JSON</button>
+  </div>
+  <div id="people-list" aria-live="polite" style="margin-top:8px;"></div>
+</section>
 
-  <section id="kitchen-section">
-    <h2>Kitchen Tasks</h2>
-    <div class="input-group">
-      <input type="text" id="kitchen-task-name" placeholder="Enter task (e.g. Breakfast)"/>
-      <input type="number" id="kitchen-task-count" placeholder="People needed" min="1" value="1"/>
-      <button id="add-kitchen-task-btn" type="button">Add Task</button>
-    </div>
-    <table id="kitchen-task-table" aria-label="Kitchen tasks table">
-      <caption>List of kitchen tasks</caption>
+<section id="kitchen-section">
+  <h2>Kitchen Tasks</h2>
+  <div class="input-group">
+    <input type="text" id="kitchen-task-name" placeholder="Enter task (e.g. Breakfast)"/>
+    <input type="number" id="kitchen-task-count" placeholder="People needed" min="1" value="1"/>
+    <button id="add-kitchen-task-btn" type="button">Add Task</button>
+  </div>
+  <table id="kitchen-task-table" aria-label="Kitchen tasks table">
+    <caption>List of kitchen tasks</caption>
+    <thead>
+      <tr><th>Task</th><th>People Needed</th><th>Days Needed</th><th>Remove</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<section id="work-section">
+  <h2>Work Duties</h2>
+  <div class="input-group">
+    <input id="work-task-name" type="text" placeholder="Enter task (e.g. Guard)"/>
+    <input id="work-task-count" type="number" placeholder="People needed" min="1" value="1"/>
+    <select id="work-task-gender" aria-label="Gender required">
+      <option>Any</option><option>Male</option><option>Female</option>
+    </select>
+    <button id="add-work-task-btn" type="button">Add Task</button>
+  </div>
+  <table id="work-task-table" aria-label="Work tasks table">
+    <caption>List of work tasks</caption>
+    <thead><tr><th>Task</th><th>People Needed</th><th>Days Needed</th><th>Remove</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<section id="availability-section">
+  <h2>Availability</h2>
+  <div class="table-scroll">
+    <table id="availability-table" aria-label="Availability grid">
+      <caption>Availability per person and day — click a cell to edit (emoji = slot enabled)</caption>
       <thead>
-        <tr><th>Task</th><th>People Needed</th><th>Days Needed</th><th>Remove</th></tr>
+        <tr><th>Person</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr>
       </thead>
       <tbody></tbody>
     </table>
-  </section>
-
-  <section id="work-section">
-    <h2>Work Duties</h2>
-    <div class="input-group">
-      <input id="work-task-name" type="text" placeholder="Enter task (e.g. Guard)"/>
-      <input id="work-task-count" type="number" placeholder="People needed" min="1" value="1"/>
-      <select id="work-task-gender" aria-label="Gender required">
-        <option>Any</option><option>Male</option><option>Female</option>
-      </select>
-      <button id="add-work-task-btn" type="button">Add Task</button>
-    </div>
-    <table id="work-task-table" aria-label="Work tasks table">
-      <caption>List of work tasks</caption>
-      <thead><tr><th>Task</th><th>People Needed</th><th>Days Needed</th><th>Remove</th></tr></thead>
-      <tbody></tbody>
-    </table>
-  </section>
-
-  <section id="availability-section">
-    <h2>Availability</h2>
-    <div class="table-scroll">
-      <table id="availability-table" aria-label="Availability grid">
-        <caption>Availability per person and day — click a cell to edit (emoji = slot enabled)</caption>
-        <thead>
-          <tr><th>Person</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-    <p style="font-size:13px;color:var(--muted); margin-top:8px;">Click a cell to edit availability for that person/day (emoji = slot enabled).</p>
-  </section>
-
-  <div class="input-group" style="margin-bottom:12px;">
-    <button id="generate-btn" type="button">Generate Schedule</button>
-    <button id="clear-btn" type="button" class="secondary">Clear Schedule</button>
-    <button id="download-btn" type="button" class="secondary">Download CSV</button>
-    <button id="darkmode-btn" type="button" class="secondary">Toggle Dark Mode</button>
   </div>
+  <p style="font-size:13px;color:var(--muted); margin-top:8px;">Click a cell to edit availability for that person/day (emoji = slot enabled).</p>
+</section>
 
-  <section id="schedule-section">
-    <h2 id="kitchen-schedule-h">Generated Kitchen Schedule</h2>
-    <div style="overflow:auto;"><table id="kitchen-schedule-table" class="schedule-table" aria-labelledby="kitchen-schedule-h"></table></div>
+<div class="input-group" style="margin-bottom:12px;">
+  <button id="generate-btn" type="button">Generate Schedule</button>
+  <button id="clear-btn" type="button" class="secondary">Clear Schedule</button>
+  <button id="download-btn" type="button" class="secondary">Download CSV</button>
+  <button id="darkmode-btn" type="button" class="secondary">Toggle Dark Mode</button>
+</div>
 
-    <h2 id="work-schedule-h">Generated Work Duties Schedule</h2>
-    <div style="overflow:auto;"><table id="work-schedule-table" class="schedule-table" aria-labelledby="work-schedule-h"></table></div>
+<section id="schedule-section">
+  <h2 id="kitchen-schedule-h">Generated Kitchen Schedule</h2>
+  <div style="overflow:auto;"><table id="kitchen-schedule-table" class="schedule-table" aria-labelledby="kitchen-schedule-h"></table></div>
 
-    <div id="fairness-summary" class="fairness-box" style="display:none;">
-      <h3 style="margin:4px 0;">Fairness summary (assignments per person)</h3>
-      <div id="fairness-content" aria-live="polite" role="status"></div>
-    </div>
-  </section>
+  <h2 id="work-schedule-h">Generated Work Duties Schedule</h2>
+  <div style="overflow:auto;"><table id="work-schedule-table" class="schedule-table" aria-labelledby="work-schedule-h"></table></div>
 
-  <!-- Reset area -->
-  <section style="background:#fff8e1;border:2px solid #ffeb3b;">
-    <h3 style="color:#ff6f00; margin:0 0 6px 0;">⚠️ Reset All Data</h3>
-    <p style="margin:0 0 8px 0;">This will permanently clear all saved people, tasks and availability.</p>
-    <button id="reset-all-btn" type="button" class="danger">Reset All Data</button>
-  </section>
+  <div id="fairness-summary" class="fairness-box" style="display:none;">
+    <h3 style="margin:4px 0;">Fairness summary (assignments per person)</h3>
+    <div id="fairness-content" aria-live="polite" role="status"></div>
+  </div>
+</section>
 
-  <div id="modal-container" aria-hidden="true"></div>
+<section style="background:#fff8e1;border:2px solid #ffeb3b;">
+  <h3 style="color:#ff6f00; margin:0 0 6px 0;">⚠️ Reset All Data</h3>
+  <p style="margin:0 0 8px 0;">This will permanently clear all saved people, tasks and availability.</p>
+  <button id="reset-all-btn" type="button" class="danger">Reset All Data</button>
+</section>
 
-  <script>
-    /* ===== Data + Defaults ===== */
-    const STORAGE_KEYS = { people: 'ws_people', kitchen: 'ws_kitchen', work: 'ws_work', availability: 'ws_avail', dark: 'ws_dark' };
-    let peopleList = JSON.parse(localStorage.getItem(STORAGE_KEYS.people) || '[]');
-    let kitchenTasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.kitchen) || '[]');
-    let workTasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.work) || '[]');
-    let availability = JSON.parse(localStorage.getItem(STORAGE_KEYS.availability) || '{}');
+<div id="modal-container" aria-hidden="true"></div>
 
-    const days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
-    const kitchenSubTasks = ["Breakfast","Lunch","Lunch Dishes","Dinner","Dinner Dishes"];
-    const allSlots = [...kitchenSubTasks, "Work Duty"];
-    const slotEmoji = { "Breakfast":"🍳","Lunch":"🥗","Lunch Dishes":"🍽️","Dinner":"🍝","Dinner Dishes":"🧽","Work Duty":"⚙️" };
+<script>
+  // ====== DATA ======
+  const STORAGE_KEYS = { people: 'ws_people', kitchen: 'ws_kitchen', work: 'ws_work', availability: 'ws_avail', dark: 'ws_dark' };
+  let peopleList = JSON.parse(localStorage.getItem(STORAGE_KEYS.people) || '[]');
+  let kitchenTasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.kitchen) || '[]');
+  let workTasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.work) || '[]');
+  let availability = JSON.parse(localStorage.getItem(STORAGE_KEYS.availability) || '{}');
 
-    /* ===== DOM references ===== */
-    const personInput = document.getElementById('person-name');
-    const personGender = document.getElementById('person-gender');
-    const addPersonBtn = document.getElementById('add-person-btn');
-    const peopleContainer = document.getElementById('people-list');
+  const days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+  const kitchenSubTasks = ["Breakfast","Lunch","Lunch Dishes","Dinner","Dinner Dishes"];
+  const allSlots = [...kitchenSubTasks,"Work Duty"];
+  const slotEmoji = { "Breakfast":"🍳","Lunch":"🥗","Lunch Dishes":"🍽️","Dinner":"🍝","Dinner Dishes":"🧽","Work Duty":"⚙️" };
 
-    const kitchenTaskInput = document.getElementById('kitchen-task-name');
-    const kitchenTaskCount = document.getElementById('kitchen-task-count');
-    const addKitchenTaskBtn = document.getElementById('add-kitchen-task-btn');
-    const kitchenTaskTable = document.getElementById('kitchen-task-table').querySelector('tbody');
+  // DOM references
+  const personInput = document.getElementById('person-name');
+  const personGender = document.getElementById('person-gender');
+  const addPersonBtn = document.getElementById('add-person-btn');
+  const peopleContainer = document.getElementById('people-list');
+  const kitchenTaskInput = document.getElementById('kitchen-task-name');
+  const kitchenTaskCount = document.getElementById('kitchen-task-count');
+  const addKitchenTaskBtn = document.getElementById('add-kitchen-task-btn');
+  const kitchenTaskTable = document.getElementById('kitchen-task-table').querySelector('tbody');
+  const workTaskInput = document.getElementById('work-task-name');
+  const workTaskCount = document.getElementById('work-task-count');
+  const workTaskGender = document.getElementById('work-task-gender');
+  const addWorkTaskBtn = document.getElementById('add-work-task-btn');
+  const workTaskTable = document.getElementById('work-task-table').querySelector('tbody');
+  const availabilityTable = document.getElementById('availability-table');
+  const availabilityTbody = availabilityTable.querySelector('tbody');
+  const generateBtn = document.getElementById('generate-btn');
+  const clearBtn = document.getElementById('clear-btn');
+  const downloadBtn = document.getElementById('download-btn');
+  const darkmodeBtn = document.getElementById('darkmode-btn');
+  const kitchenScheduleTable = document.getElementById('kitchen-schedule-table');
+  const workScheduleTable = document.getElementById('work-schedule-table');
+  const fairnessSummaryBox = document.getElementById('fairness-summary');
+  const fairnessContent = document.getElementById('fairness-content');
+  const exportJsonBtn = document.getElementById('export-json-btn');
+  const importFileInput = document.getElementById('import-json');
+  const importJsonBtn = document.getElementById('import-json-btn');
+  const resetAllBtn = document.getElementById('reset-all-btn');
+  const modalContainer = document.getElementById('modal-container');
 
-    const workTaskInput = document.getElementById('work-task-name');
-    const workTaskCount = document.getElementById('work-task-count');
-    const workTaskGender = document.getElementById('work-task-gender');
-    const addWorkTaskBtn = document.getElementById('add-work-task-btn');
-    const workTaskTable = document.getElementById('work-task-table').querySelector('tbody');
+  // ===== UTILS ======
+  function escapeHtml(str){ return String(str).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+  function saveData(){ localStorage.setItem(STORAGE_KEYS.people, JSON.stringify(peopleList)); localStorage.setItem(STORAGE_KEYS.kitchen, JSON.stringify(kitchenTasks)); localStorage.setItem(STORAGE_KEYS.work, JSON.stringify(workTasks)); localStorage.setItem(STORAGE_KEYS.availability, JSON.stringify(availability)); }
+  function setDarkMode(enabled){ document.body.classList.toggle('dark', !!enabled); localStorage.setItem(STORAGE_KEYS.dark, enabled?'1':'0'); }
+  setDarkMode(localStorage.getItem(STORAGE_KEYS.dark)==='1');
+  function shuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a; }
 
-    const availabilityTable = document.getElementById('availability-table');
-    const availabilityTbody = availabilityTable.querySelector('tbody');
-
-    const generateBtn = document.getElementById('generate-btn');
-    const clearBtn = document.getElementById('clear-btn');
-    const downloadBtn = document.getElementById('download-btn');
-    const darkmodeBtn = document.getElementById('darkmode-btn');
-
-    const kitchenScheduleTable = document.getElementById('kitchen-schedule-table');
-    const workScheduleTable = document.getElementById('work-schedule-table');
-
-    const fairnessSummaryBox = document.getElementById('fairness-summary');
-    const fairnessContent = document.getElementById('fairness-content');
-
-    const exportJsonBtn = document.getElementById('export-json-btn');
-    const importFileInput = document.getElementById('import-json');
-    const importJsonBtn = document.getElementById('import-json-btn');
-
-    const resetAllBtn = document.getElementById('reset-all-btn');
-    const modalContainer = document.getElementById('modal-container');
-
-    /* ===== Utility helpers ===== */
-    function escapeHtml(str){ return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-    function saveData(){ localStorage.setItem(STORAGE_KEYS.people, JSON.stringify(peopleList)); localStorage.setItem(STORAGE_KEYS.kitchen, JSON.stringify(kitchenTasks)); localStorage.setItem(STORAGE_KEYS.work, JSON.stringify(workTasks)); localStorage.setItem(STORAGE_KEYS.availability, JSON.stringify(availability)); }
-    function setDarkMode(enabled){ document.body.classList.toggle('dark', !!enabled); localStorage.setItem(STORAGE_KEYS.dark, enabled ? '1' : '0'); }
-    setDarkMode(localStorage.getItem(STORAGE_KEYS.dark) === '1');
-    function shuffle(arr){ const a = arr.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-
-    /* ===== Ensure availability structure ===== */
-    function ensureAvailabilityStructure(){
-      peopleList.forEach(p=>{
-        if(!availability[p.name]) availability[p.name] = {};
-        days.forEach(d=>{
-          if(!availability[p.name][d]) availability[p.name][d] = {};
-          allSlots.forEach(s=>{
-            if(availability[p.name][d][s] === undefined) availability[p.name][d][s] = true;
-          });
-        });
+  function ensureAvailabilityStructure(){
+    peopleList.forEach(p=>{
+      if(!availability[p.name]) availability[p.name]={};
+      days.forEach(d=>{
+        if(!availability[p.name][d]) availability[p.name][d]={};
+        allSlots.forEach(s=>{ if(availability[p.name][d][s]===undefined) availability[p.name][d][s]=true; });
       });
-      // remove entries for removed people
-      Object.keys(availability).forEach(name => { if(!peopleList.find(p=>p.name===name)) delete availability[name]; });
-    }
-
-    /* ===== Seed default kitchen tasks ===== */
-    function seedDefaultKitchenTasks(){
-      if(kitchenTasks && kitchenTasks.length > 0) return;
-      const defaults = kitchenSubTasks.map(name => ({ name, count: 1, days: Object.fromEntries(days.map(d=>[d,true])) }));
-      kitchenTasks = defaults;
-      saveData();
-    }
-
-    /* ===== Renderers ===== */
-    function renderPeople(){
-      peopleContainer.innerHTML = '';
-      peopleList.forEach((p, idx)=>{
-        const div = document.createElement('div');
-        div.className = 'person-list-item';
-        const left = document.createElement('div');
-        left.textContent = `${p.name} (${p.gender})`;
-        const btn = document.createElement('button');
-        btn.type='button'; btn.className='remove-btn'; btn.textContent='Remove';
-        btn.addEventListener('click', ()=>{
-          if(!confirm(`Remove ${p.name}?`)) return;
-          peopleList.splice(idx,1);
-          saveData();
-          ensureAvailabilityStructure();
-          renderPeople();
-          renderAvailability();
-        });
-        div.appendChild(left); div.appendChild(btn);
-        peopleContainer.appendChild(div);
-      });
-    }
-
-    function renderTasks(taskArray, tbody){
-      tbody.innerHTML = '';
-      taskArray.forEach((task, idx)=>{
-        const tr = document.createElement('tr');
-        const nameTd = document.createElement('td'); nameTd.textContent = task.name; tr.appendChild(nameTd);
-
-        const countTd = document.createElement('td');
-        const countInput = document.createElement('input');
-        countInput.type='number'; countInput.min=1; countInput.value = task.count || 1;
-        countInput.addEventListener('change', ()=>{ task.count = Math.max(1, parseInt(countInput.value)||1); saveData(); });
-        countTd.appendChild(countInput); tr.appendChild(countTd);
-
-        const daysTd = document.createElement('td');
-        days.forEach(d=>{
-          const label = document.createElement('label');
-          label.style.marginRight='6px';
-          const cb = document.createElement('input');
-          cb.type='checkbox'; cb.checked = !!(task.days && task.days[d]);
-          cb.addEventListener('change', ()=>{
-            task.days = task.days || {};
-            task.days[d] = cb.checked;
-            saveData();
-          });
-          label.appendChild(cb); label.appendChild(document.createTextNode(' '+d[0]));
-          daysTd.appendChild(label);
-        });
-        tr.appendChild(daysTd);
-
-        const removeTd = document.createElement('td');
-        const btn = document.createElement('button'); btn.type='button'; btn.className='remove-btn'; btn.textContent='Remove';
-        btn.addEventListener('click', ()=>{ taskArray.splice(idx,1); saveData(); renderTasks(taskArray, tbody); });
-        removeTd.appendChild(btn); tr.appendChild(removeTd);
-
-        tbody.appendChild(tr);
-      });
-    }
-
-    function renderAvailability(){
-      ensureAvailabilityStructure();
-      availabilityTbody.innerHTML = '';
-      peopleList.forEach(person=>{
-        const tr = document.createElement('tr');
-        const nameCell = document.createElement('td'); nameCell.textContent = person.name; tr.appendChild(nameCell);
-        days.forEach(day=>{
-          const td = document.createElement('td');
-          td.className = 'avail-cell';
-          td.tabIndex = 0;
-          const slots = allSlots.filter(s => !!availability[person.name][day][s]);
-          td.textContent = '';
-          slots.forEach(s => {
-            const span = document.createElement('span');
-            span.title = s;
-            span.style.margin = '0 2px';
-            span.style.fontSize = '18px';
-            span.textContent = slotEmoji[s] || s[0];
-            td.appendChild(span);
-          });
-          td.addEventListener('click', ()=> openAvailabilityModal(person.name, day, td));
-          td.addEventListener('keydown', (ev)=>{ if(ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openAvailabilityModal(person.name, day, td); } });
-          tr.appendChild(td);
-        });
-        availabilityTbody.appendChild(tr);
-      });
-    }
-
-    /* ===== Modal (availability editor) ===== */
-    let activeModal = null;
-    let lastFocusedElement = null;
-
-    function openAvailabilityModal(personName, day, anchorCell){
-      closeModal();
-
-      lastFocusedElement = document.activeElement;
-      const backdrop = document.createElement('div');
-      backdrop.className = 'modal-backdrop';
-      backdrop.tabIndex = -1;
-
-      const modal = document.createElement('div');
-      modal.className = 'modal';
-      modal.setAttribute('role','dialog');
-      modal.setAttribute('aria-modal','true');
-      modal.setAttribute('aria-label', `${personName} ${day} availability`);
-
-      const header = document.createElement('div');
-      header.style.fontWeight = 600;
-      header.style.marginBottom = '8px';
-      header.textContent = `${personName} — ${day}`;
-      modal.appendChild(header);
-
-      const form = document.createElement('div');
-      form.style.display='grid';
-      form.style.gridTemplateColumns='1fr 1fr';
-      form.style.gap='6px';
-
-      allSlots.forEach(slot=>{
-        const label = document.createElement('label');
-        label.style.display='flex'; label.style.alignItems='center'; label.style.gap='8px';
-        const cb = document.createElement('input');
-        cb.type='checkbox';
-        cb.dataset.slot = slot;
-        cb.checked = !!availability[personName][day][slot];
-        const emojiSpan = document.createElement('span'); emojiSpan.textContent = slotEmoji[slot] || slot[0];
-        const text = document.createElement('span'); text.textContent = slot; text.style.fontSize='13px';
-        label.appendChild(cb); label.appendChild(emojiSpan); label.appendChild(text);
-        form.appendChild(label);
-
-        cb.addEventListener('change', (e) => {
-          if(slot === 'Lunch Dishes' || slot === 'Work Duty'){
-            const other = slot === 'Lunch Dishes' ? 'Work Duty' : 'Lunch Dishes';
-            const others = form.querySelectorAll('input[type=checkbox]');
-            others.forEach(o => { if(o.dataset.slot === other) o.checked = cb.checked; });
-          }
-        });
-      });
-
-      modal.appendChild(form);
-
-      const btnRow = document.createElement('div');
-      btnRow.style.display='flex'; btnRow.style.justifyContent='flex-end'; btnRow.style.marginTop='10px'; btnRow.style.gap='8px';
-
-      const doneBtn = document.createElement('button'); doneBtn.type='button'; doneBtn.textContent='Done';
-      doneBtn.addEventListener('click', ()=> {
-        const cbs = form.querySelectorAll('input[type=checkbox]');
-        cbs.forEach(cb => {
-          const s = cb.dataset.slot;
-          availability[personName][day][s] = cb.checked;
-        });
-        const ld = !!availability[personName][day]['Lunch Dishes'];
-        const wd = !!availability[personName][day]['Work Duty'];
-        const both = ld || wd;
-        availability[personName][day]['Lunch Dishes'] = both;
-        availability[personName][day]['Work Duty'] = both;
-
-        saveData();
-        renderAvailability();
-        closeModal();
-      });
-
-      const cancelBtn = document.createElement('button'); cancelBtn.type='button'; cancelBtn.textContent='Cancel';
-      cancelBtn.className='secondary';
-      cancelBtn.addEventListener('click', ()=> closeModal());
-
-      btnRow.appendChild(cancelBtn); btnRow.appendChild(doneBtn);
-      modal.appendChild(btnRow);
-
-      backdrop.appendChild(modal);
-      modalContainer.appendChild(backdrop);
-      modalContainer.setAttribute('aria-hidden','false');
-
-      activeModal = backdrop;
-      setTimeout(()=> {
-        const firstInput = modal.querySelector('input[type=checkbox]');
-        if(firstInput) firstInput.focus();
-      }, 20);
-
-      backdrop.addEventListener('click', (ev) => {
-        if(ev.target === backdrop) closeModal();
-      });
-      function onKey(ev){
-        if(ev.key === 'Escape') closeModal();
-      }
-      document.addEventListener('keydown', onKey);
-      backdrop._cleanup = ()=>{ document.removeEventListener('keydown', onKey); };
-    }
-
-    function closeModal(){
-      if(activeModal){
-        try{ if(activeModal._cleanup) activeModal._cleanup(); }catch(e){}
-        activeModal.remove();
-        activeModal = null;
-        modalContainer.setAttribute('aria-hidden','true');
-        if(lastFocusedElement && typeof lastFocusedElement.focus === 'function') lastFocusedElement.focus();
-        lastFocusedElement = null;
-      }
-    }
-
-    /* ===== Event wiring (adders) ===== */
-    addPersonBtn.addEventListener('click', ()=>{
-      const nameRaw = personInput.value.trim();
-      if(!nameRaw) { alert('Name required'); return; }
-      const name = nameRaw;
-      const gender = personGender.value;
-      if(peopleList.find(p=>p.name.toLowerCase() === name.toLowerCase())) { alert('Person already exists'); return; }
-      peopleList.push({ name, gender });
-      availability[name] = availability[name] || {};
-      days.forEach(d=> { availability[name][d] = availability[name][d] || {}; allSlots.forEach(s=>{ if(availability[name][d][s] === undefined) availability[name][d][s]=true; }); });
-      saveData();
-      renderPeople(); renderAvailability();
-      personInput.value = '';
+      if(!p.loadFactor) p.loadFactor=1; // default full load
     });
+    Object.keys(availability).forEach(name=>{ if(!peopleList.find(p=>p.name===name)) delete availability[name]; });
+  }
 
-    addKitchenTaskBtn.addEventListener('click', ()=>{
-      const name = kitchenTaskInput.value.trim();
-      const count = Math.max(1, parseInt(kitchenTaskCount.value) || 1);
-      if(!name) { alert('Task name required'); return; }
-      const task = { name, count, days: {} };
-      days.forEach(d => task.days[d] = true);
-      kitchenTasks.push(task);
-      saveData();
-      renderTasks(kitchenTasks, kitchenTaskTable);
-      kitchenTaskInput.value=''; kitchenTaskCount.value=1;
+  function seedDefaultKitchenTasks(){
+    if(kitchenTasks && kitchenTasks.length>0) return;
+    const defaults=kitchenSubTasks.map(name=>({name,count:1,days:Object.fromEntries(days.map(d=>[d,true]))}));
+    kitchenTasks=defaults; saveData();
+  }
+  // ===== RENDER ======
+  function renderPeople(){
+    peopleContainer.innerHTML='';
+    peopleList.forEach((p,idx)=>{
+      const div=document.createElement('div'); div.className='person-list-item';
+      const left=document.createElement('div'); left.textContent=`${p.name} (${p.gender}) [Load: ${p.loadFactor}]`;
+      const btn=document.createElement('button'); btn.type='button'; btn.className='remove-btn'; btn.textContent='Remove';
+      btn.addEventListener('click',()=>{
+        if(!confirm(`Remove ${p.name}?`)) return;
+        peopleList.splice(idx,1);
+        saveData(); ensureAvailabilityStructure();
+        renderPeople(); renderAvailability();
+      });
+      div.appendChild(left); div.appendChild(btn);
+      peopleContainer.appendChild(div);
     });
+  }
 
-    addWorkTaskBtn.addEventListener('click', ()=>{
-      const name = workTaskInput.value.trim();
-      const count = Math.max(1, parseInt(workTaskCount.value) || 1);
-      const genderReq = workTaskGender.value;
-      if(!name) { alert('Task name required'); return; }
-      const task = { name, count, days: {} , genderRequired: genderReq};
-      days.forEach(d=>task.days[d]=false);
-      workTasks.push(task);
-      saveData();
-      renderTasks(workTasks, workTaskTable);
-      workTaskInput.value=''; workTaskCount.value=1; workTaskGender.value='Any';
+  function renderTasks(taskArray, tbody){
+    tbody.innerHTML='';
+    taskArray.forEach((task,idx)=>{
+      const tr=document.createElement('tr');
+      const nameTd=document.createElement('td'); nameTd.textContent=task.name; tr.appendChild(nameTd);
+      const countTd=document.createElement('td');
+      const countInput=document.createElement('input'); countInput.type='number'; countInput.min=1; countInput.value=task.count||1;
+      countInput.addEventListener('change',()=>{ task.count=Math.max(1,parseInt(countInput.value)||1); saveData(); });
+      countTd.appendChild(countInput); tr.appendChild(countTd);
+
+      const daysTd=document.createElement('td');
+      days.forEach(d=>{
+        const label=document.createElement('label'); label.style.marginRight='6px';
+        const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!!(task.days && task.days[d]);
+        cb.addEventListener('change',()=>{ task.days=task.days||{}; task.days[d]=cb.checked; saveData(); });
+        label.appendChild(cb); label.appendChild(document.createTextNode(' '+d[0]));
+        daysTd.appendChild(label);
+      });
+      tr.appendChild(daysTd);
+
+      const removeTd=document.createElement('td');
+      const btn=document.createElement('button'); btn.type='button'; btn.className='remove-btn'; btn.textContent='Remove';
+      btn.addEventListener('click',()=>{ taskArray.splice(idx,1); saveData(); renderTasks(taskArray,tbody); });
+      removeTd.appendChild(btn); tr.appendChild(removeTd);
+
+      tbody.appendChild(tr);
     });
+  }
 
-    /* ===== Seed & init ===== */
-    seedDefaultKitchenTasks();
+  function renderAvailability(){
     ensureAvailabilityStructure();
-
-    /* ===== Generator (improved balancing + stability) ===== */
-    generateBtn.addEventListener('click', generateSchedule);
-    clearBtn.addEventListener('click', ()=>{ kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessSummaryBox.style.display='none'; });
-
-    function generateSchedule(){
-      kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessContent.innerHTML=''; fairnessSummaryBox.style.display='none';
-      ensureAvailabilityStructure();
-      saveData();
-      if(peopleList.length === 0) { alert('Add people first.'); return; }
-
-      const nameIndex = Object.fromEntries(peopleList.map((p, i) => [p.name, i]));
-
-      // build kitchen schedule table
-      const kHead = kitchenScheduleTable.createTHead();
-      const kHeadRow = kHead.insertRow();
-      kHeadRow.insertCell().textContent = 'Day';
-      kHeadRow.insertCell().textContent = 'Slot';
-      peopleList.forEach(p => kHeadRow.insertCell().textContent = p.name);
-      const kBody = kitchenScheduleTable.createTBody();
-      const kRows = {};
+    availabilityTbody.innerHTML='';
+    peopleList.forEach(person=>{
+      const tr=document.createElement('tr');
+      const nameCell=document.createElement('td'); nameCell.textContent=person.name; tr.appendChild(nameCell);
       days.forEach(day=>{
-        kitchenSubTasks.forEach((sub, idx)=>{
-          const row = kBody.insertRow();
-          if(idx === 0){ const cell = row.insertCell(); cell.textContent = day; cell.rowSpan = kitchenSubTasks.length; }
-          row.insertCell().textContent = sub;
-          peopleList.forEach(()=> row.insertCell());
-          kRows[`${day}-${sub}`] = row;
+        const td=document.createElement('td'); td.className='avail-cell'; td.tabIndex=0;
+        const slots=allSlots.filter(s=>!!availability[person.name][day][s]);
+        td.textContent='';
+        slots.forEach(s=>{
+          const span=document.createElement('span'); span.title=s; span.style.margin='0 2px'; span.style.fontSize='18px';
+          span.textContent=slotEmoji[s]||s[0]; td.appendChild(span);
         });
+        td.addEventListener('click',()=>openAvailabilityModal(person.name,day,td));
+        td.addEventListener('keydown',ev=>{ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); openAvailabilityModal(person.name,day,td); } });
+        tr.appendChild(td);
       });
+      availabilityTbody.appendChild(tr);
+    });
+  }
 
-      // build work table
-      const wHead = workScheduleTable.createTHead();
-      const wHeadRow = wHead.insertRow();
-      wHeadRow.insertCell().textContent = 'Day';
-      peopleList.forEach(p => wHeadRow.insertCell().textContent = p.name);
-      const wBody = workScheduleTable.createTBody();
-      const wRows = {};
-      days.forEach(day=>{
-        const row = wBody.insertRow();
-        row.insertCell().textContent = day;
-        peopleList.forEach(()=> row.insertCell());
-        wRows[day] = row;
+  // ===== MODAL ======
+  let activeModal=null; let lastFocusedElement=null;
+
+  function openAvailabilityModal(personName,day,anchorCell){
+    closeModal(); lastFocusedElement=document.activeElement;
+    const backdrop=document.createElement('div'); backdrop.className='modal-backdrop'; backdrop.tabIndex=-1;
+    const modal=document.createElement('div'); modal.className='modal';
+    modal.setAttribute('role','dialog'); modal.setAttribute('aria-modal','true'); modal.setAttribute('aria-label',`${personName} ${day} availability`);
+
+    const header=document.createElement('div'); header.style.fontWeight=600; header.style.marginBottom='8px'; header.textContent=`${personName} — ${day}`; modal.appendChild(header);
+
+    const form=document.createElement('div'); form.style.display='grid'; form.style.gridTemplateColumns='1fr 1fr'; form.style.gap='6px';
+    allSlots.forEach(slot=>{
+      const label=document.createElement('label'); label.style.display='flex'; label.style.alignItems='center'; label.style.gap='8px';
+      const cb=document.createElement('input'); cb.type='checkbox'; cb.dataset.slot=slot; cb.checked=!!availability[personName][day][slot];
+      const emojiSpan=document.createElement('span'); emojiSpan.textContent=slotEmoji[slot]||slot[0];
+      const text=document.createElement('span'); text.textContent=slot; text.style.fontSize='13px';
+      label.appendChild(cb); label.appendChild(emojiSpan); label.appendChild(text); form.appendChild(label);
+    });
+    modal.appendChild(form);
+
+    const btnRow=document.createElement('div'); btnRow.style.display='flex'; btnRow.style.justifyContent='flex-end'; btnRow.style.marginTop='10px'; btnRow.style.gap='8px';
+    const doneBtn=document.createElement('button'); doneBtn.type='button'; doneBtn.textContent='Done';
+    doneBtn.addEventListener('click',()=>{
+      const cbs=form.querySelectorAll('input[type=checkbox]');
+      cbs.forEach(cb=>{ const s=cb.dataset.slot; availability[personName][day][s]=cb.checked; });
+      saveData(); renderAvailability(); closeModal();
+    });
+    const cancelBtn=document.createElement('button'); cancelBtn.type='button'; cancelBtn.textContent='Cancel'; cancelBtn.className='secondary';
+    cancelBtn.addEventListener('click',()=>closeModal());
+    btnRow.appendChild(cancelBtn); btnRow.appendChild(doneBtn); modal.appendChild(btnRow);
+
+    backdrop.appendChild(modal); modalContainer.appendChild(backdrop); modalContainer.setAttribute('aria-hidden','false'); activeModal=backdrop;
+    setTimeout(()=>{ const firstInput=modal.querySelector('input[type=checkbox]'); if(firstInput) firstInput.focus(); },20);
+    backdrop.addEventListener('click',ev=>{ if(ev.target===backdrop) closeModal(); });
+    function onKey(ev){ if(ev.key==='Escape') closeModal(); }
+    document.addEventListener('keydown',onKey); backdrop._cleanup=()=>{ document.removeEventListener('keydown',onKey); };
+  }
+
+  function closeModal(){ if(activeModal){ try{ if(activeModal._cleanup) activeModal._cleanup(); }catch(e){} activeModal.remove(); activeModal=null;
+    modalContainer.setAttribute('aria-hidden','true'); if(lastFocusedElement&&typeof lastFocusedElement.focus==='function') lastFocusedElement.focus(); lastFocusedElement=null; }
+  }
+
+  // ===== EVENT WIRING ======
+  addPersonBtn.addEventListener('click',()=>{
+    const nameRaw=personInput.value.trim(); if(!nameRaw){ alert('Name required'); return; }
+    const name=nameRaw; const gender=personGender.value;
+    if(peopleList.find(p=>p.name.toLowerCase()===name.toLowerCase())){ alert('Person exists'); return; }
+    peopleList.push({name,gender,loadFactor:1}); availability[name]=availability[name]||{}; days.forEach(d=>{ availability[name][d]=availability[name][d]||{}; allSlots.forEach(s=>{ if(availability[name][d][s]===undefined) availability[name][d][s]=true; }); });
+    saveData(); renderPeople(); renderAvailability(); personInput.value='';
+  });
+
+  addKitchenTaskBtn.addEventListener('click',()=>{
+    const name=kitchenTaskInput.value.trim(); const count=Math.max(1,parseInt(kitchenTaskCount.value)||1);
+    if(!name){ alert('Task name required'); return; }
+    const task={name,count,days:{}}; days.forEach(d=>task.days[d]=true); kitchenTasks.push(task);
+    saveData(); renderTasks(kitchenTasks,kitchenTaskTable); kitchenTaskInput.value=''; kitchenTaskCount.value=1;
+  });
+
+  addWorkTaskBtn.addEventListener('click',()=>{
+    const name=workTaskInput.value.trim(); const count=Math.max(1,parseInt(workTaskCount.value)||1); const genderReq=workTaskGender.value;
+    if(!name){ alert('Task name required'); return; }
+    const task={name,count,days:{},genderRequired:genderReq}; days.forEach(d=>task.days[d]=false); workTasks.push(task);
+    saveData(); renderTasks(workTasks,workTaskTable); workTaskInput.value=''; workTaskCount.value=1; workTaskGender.value='Any';
+  });
+
+  // ===== GENERATOR ======
+  generateBtn.addEventListener('click',generateSchedule);
+  clearBtn.addEventListener('click',()=>{ kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessSummaryBox.style.display='none'; });
+
+  function generateSchedule(){
+    kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessContent.innerHTML=''; fairnessSummaryBox.style.display='none';
+    ensureAvailabilityStructure(); saveData(); if(peopleList.length===0){ alert('Add people first'); return; }
+
+    const nameIndex=Object.fromEntries(peopleList.map((p,i)=>[p.name,i]));
+
+    // Build kitchen table
+    const kHead=kitchenScheduleTable.createTHead(); const kHeadRow=kHead.insertRow();
+    kHeadRow.insertCell().textContent='Day'; kHeadRow.insertCell().textContent='Slot';
+    peopleList.forEach(p=>kHeadRow.insertCell().textContent=p.name);
+    const kBody=kitchenScheduleTable.createTBody(); const kRows={};
+    days.forEach(day=>{ kitchenSubTasks.forEach((sub,idx)=>{
+      const row=kBody.insertRow();
+      if(idx===0){ const cell=row.insertCell(); cell.textContent=day; cell.rowSpan=kitchenSubTasks.length; }
+      row.insertCell().textContent=sub; peopleList.forEach(()=>row.insertCell()); kRows[`${day}-${sub}`]=row;
+    });});
+
+    // Work table
+    const wHead=workScheduleTable.createTHead(); const wHeadRow=wHead.insertRow();
+    wHeadRow.insertCell().textContent='Day'; peopleList.forEach(p=>wHeadRow.insertCell().textContent=p.name);
+    const wBody=workScheduleTable.createTBody(); const wRows={};
+    days.forEach(day=>{ const row=wBody.insertRow(); row.insertCell().textContent=day; peopleList.forEach(()=>row.insertCell()); wRows[day]=row; });
+
+    const totalAssignments=Object.fromEntries(peopleList.map(p=>[p.name,0]));
+    const dailyAssignedKitchen=Object.fromEntries(days.map(d=>[d,new Set()])); const dailyAssignedWork=Object.fromEntries(days.map(d=>[d,new Set()]));
+    const lastWorkDay=Object.fromEntries(peopleList.map(p=>[p.name,null]));
+    const personLastTasks=Object.fromEntries(peopleList.map(p=>[p.name,new Set()]));
+
+    function sortCandidates(candidates,taskName){
+      const shuffled=shuffle(candidates);
+      shuffled.sort((a,b)=>{
+        const loadAdj=(ta,lf)=>ta/lf; 
+        const taA=totalAssignments[a.name]; const taB=totalAssignments[b.name];
+        const la=loadAdj(taA,a.loadFactor); const lb=loadAdj(taB,b.loadFactor);
+        const repA=personLastTasks[a.name].has(taskName)?1:0;
+        const repB=personLastTasks[b.name].has(taskName)?1:0;
+        return la+repA - (lb+repB);
       });
-
-      const totalAssignments = Object.fromEntries(peopleList.map(p=>[p.name,0]));
-      const dailyAssignedKitchen = Object.fromEntries(days.map(d=>[d,new Set()]));
-      const dailyAssignedWork = Object.fromEntries(days.map(d=>[d,new Set()]));
-      const lastWorkDay = Object.fromEntries(peopleList.map(p=>[p.name, null]));
-
-      function sortCandidatesByFairness(candidates){
-        if(!candidates || candidates.length===0) return [];
-        const avg = Object.values(totalAssignments).reduce((a,b)=>a+b,0) / Math.max(1, peopleList.length);
-        const shuffled = shuffle(candidates.slice());
-        shuffled.sort((a,b)=>{
-          const ta = totalAssignments[a.name];
-          const tb = totalAssignments[b.name];
-          const aScore = ta + (ta < avg ? -0.25 : 0);
-          const bScore = tb + (tb < avg ? -0.25 : 0);
-          if(aScore !== bScore) return aScore - bScore;
-          return Math.random() < 0.5 ? -1 : 1;
-        });
-        return shuffled;
-      }
-
-      function pickCandidate(candidates){
-        const sorted = sortCandidatesByFairness(candidates);
-        return sorted.length ? sorted[0] : null;
-      }
-
-      // helper to get correct person cell in a kitchen row (handles rowspan / missing Day cell)
-      function getKitchenPersonCell(row, personIdx){
-        // If row includes the Day cell + Slot cell + person columns, cells.length === 2 + peopleCount
-        // That means person columns start at index 2. Otherwise they start at 1.
-        const expectedWithDay = 2 + peopleList.length;
-        const base = (row.cells.length === expectedWithDay) ? 2 : 1;
-        return row.cells[base + personIdx];
-      }
-
-      days.forEach(day=>{
-        const lunchRow = kRows[`${day}-Lunch Dishes`];
-
-        // KITCHEN
-        kitchenSubTasks.forEach(sub=>{
-          const matching = kitchenTasks.filter(t => t.name === sub && t.days && t.days[day]);
-          if(matching.length === 0) return;
-          matching.forEach(task=>{
-            for(let s=0;s<task.count;s++){
-              let eligible = peopleList.filter(p=>{
-                const personAvail = availability[p.name] && availability[p.name][day];
-                if(!personAvail) return false;
-                if(!personAvail[sub]) return false;
-                if(dailyAssignedKitchen[day].has(p.name)) return false;
-                return true;
-              });
-
-              if(eligible.length === 0){
-                eligible = peopleList.filter(p => availability[p.name] && availability[p.name][day] && availability[p.name][day][sub] && !dailyAssignedKitchen[day].has(p.name));
-              }
-              if(eligible.length === 0) eligible = peopleList.filter(p => !dailyAssignedKitchen[day].has(p.name));
-              if(eligible.length === 0) eligible = peopleList.slice();
-
-              const chosen = pickCandidate(eligible);
-              if(!chosen) continue;
-
-              totalAssignments[chosen.name] += 1;
-              dailyAssignedKitchen[day].add(chosen.name);
-
-              const row = kRows[`${day}-${sub}`];
-              const idx = nameIndex[chosen.name];
-              const cell = getKitchenPersonCell(row, idx);
-              if(cell){
-                cell.textContent = (cell.textContent ? cell.textContent + ', ' : '') + '✓';
-                cell.className = 'kitchen-task';
-              }
-            }
-          });
-        });
-
-        // WORK
-        workTasks.forEach(task=>{
-          if(!task.days || !task.days[day]) return;
-
-          let available = peopleList.filter(p=>{
-            const personAvail = availability[p.name] && availability[p.name][day];
-            if(!personAvail) return false;
-            if(!personAvail['Work Duty']) return false;
-            if(lunchRow){
-              const pi = nameIndex[p.name];
-              // lunchRow always has the Day cell when built (we inserted Day in first sub-row),
-              // so person columns for lunchRow are at index 2 + pi
-              const c = lunchRow.cells[2 + pi];
-              if(c && c.textContent && c.textContent.includes('✓')) return false;
-            }
-            if(task.genderRequired && task.genderRequired !== 'Any' && p.gender !== task.genderRequired) return false;
-            const yIdx = days.indexOf(day) - 1;
-            if(yIdx >= 0){
-              const yesterday = days[yIdx];
-              if(lastWorkDay[p.name] === yesterday) return false;
-            }
-            if(dailyAssignedWork[day].has(p.name)) return false;
-            return true;
-          });
-
-          if(available.length === 0){
-            available = peopleList.filter(p=>{
-              const personAvail = availability[p.name] && availability[p.name][day];
-              if(!personAvail) return false;
-              if(!personAvail['Work Duty']) return false;
-              if(task.genderRequired && task.genderRequired !== 'Any' && p.gender !== task.genderRequired) return false;
-              if(dailyAssignedWork[day].has(p.name)) return false;
-              return true;
-            });
-          }
-          if(available.length === 0) return;
-
-          const sorted = sortCandidatesByFairness(available);
-          const chosenSet = new Set();
-          for(let i=0;i<task.count;i++){
-            const chosen = sorted.find(c => !chosenSet.has(c.name)) || sorted[0];
-            if(!chosen) continue;
-            chosenSet.add(chosen.name);
-            totalAssignments[chosen.name] += 1;
-            lastWorkDay[chosen.name] = day;
-            dailyAssignedWork[day].add(chosen.name);
-
-            const wRow = wRows[day];
-            const personIdx = nameIndex[chosen.name];
-            const cell = wRow.cells[1 + personIdx];
-            if(cell){
-              cell.textContent = (cell.textContent ? cell.textContent + ', ' : '') + task.name;
-              cell.className = 'work-task';
-            }
-          }
-        });
-      });
-
-      // fairness summary
-      const rows = Object.entries(totalAssignments).sort((a,b)=>b[1]-a[1]);
-      fairnessContent.innerHTML = rows.map(([name,count]) => `<div style="display:flex;justify-content:space-between;padding:2px 0;"><strong>${escapeHtml(name)}</strong><span>${count}</span></div>`).join('');
-      fairnessSummaryBox.style.display = 'block';
-      fairnessContent.setAttribute('aria-hidden','false');
+      return shuffled;
     }
 
-    /* ===== CSV download (fixed) ===== */
-    downloadBtn.addEventListener('click', ()=>{
-      function tableToCSV(table){
-        if(!table || !table.rows || table.rows.length===0) return '';
-        const lines=[];
-        for(let r=0;r<table.rows.length;r++){
-          const cells = table.rows[r].cells;
-          const row=[];
-          for(let c=0;c<cells.length;c++){
-            row.push('"' + (cells[c].textContent || '').replace(/"/g,'""') + '"');
+    function pickCandidate(candidates,taskName){
+      const sorted=sortCandidates(candidates,taskName);
+      if(sorted.length===0) return null;
+      const chosen=sorted[0]; personLastTasks[chosen.name].add(taskName); return chosen;
+    }
+
+    function getKitchenPersonCell(row,personIdx){
+      const expectedWithDay=2+peopleList.length; const base=(row.cells.length===expectedWithDay)?2:1;
+      return row.cells[base+personIdx];
+    }
+
+    days.forEach(day=>{
+      const lunchRow=kRows[`${day}-Lunch Dishes`];
+
+      // Kitchen
+      kitchenSubTasks.forEach(sub=>{
+        const matching=kitchenTasks.filter(t=>t.name===sub && t.days && t.days[day]);
+        matching.forEach(task=>{
+          for(let s=0;s<task.count;s++){
+            let eligible=peopleList.filter(p=>availability[p.name][day][sub] && !dailyAssignedKitchen[day].has(p.name));
+            if(eligible.length===0) eligible=peopleList.filter(p=>availability[p.name][day][sub]);
+            if(eligible.length===0) eligible=peopleList.slice();
+            const chosen=pickCandidate(eligible,sub); if(!chosen) continue;
+            totalAssignments[chosen.name]+=1; dailyAssignedKitchen[day].add(chosen.name);
+            const row=kRows[`${day}-${sub}`]; const idx=nameIndex[chosen.name]; const cell=getKitchenPersonCell(row,idx);
+            if(cell){ cell.textContent=(cell.textContent?cell.textContent+', ':'')+'✓'; cell.className='kitchen-task'; }
           }
-          lines.push(row.join(','));
+        });
+      });
+
+      // Work
+      workTasks.forEach(task=>{
+        if(!task.days[day]) return;
+        let eligible=peopleList.filter(p=>availability[p.name][day]['Work Duty'] && !dailyAssignedWork[day].has(p.name));
+        if(task.genderRequired!=='Any') eligible=eligible.filter(p=>p.gender===task.genderRequired);
+        if(lunchRow) eligible=eligible.filter(p=>{ const c=lunchRow.cells[2+nameIndex[p.name]]; return !(c&&c.textContent.includes('✓')); });
+        if(eligible.length===0) eligible=peopleList.filter(p=>availability[p.name][day]['Work Duty']);
+        const chosenSet=new Set();
+        for(let i=0;i<task.count;i++){
+          const chosen=pickCandidate(eligible,task.name); if(!chosen) continue;
+          chosenSet.add(chosen.name); totalAssignments[chosen.name]+=1; lastWorkDay[chosen.name]=day; dailyAssignedWork[day].add(chosen.name);
+          const wRow=wRows[day]; const cell=wRow.cells[1+nameIndex[chosen.name]];
+          if(cell){ cell.textContent=(cell.textContent?cell.textContent+', ':'')+task.name; cell.className='work-task'; }
         }
-        return lines.join('\n');
-      }
-      const kitchenCSV = tableToCSV(kitchenScheduleTable);
-      const workCSV = tableToCSV(workScheduleTable);
-      const fairnessText = Array.from(document.querySelectorAll('#fairness-content div')).map(d => d.textContent).join('\n');
-
-      const combined = [
-        '"Kitchen Schedule"',
-        '',
-        kitchenCSV,
-        '',
-        '"Work Schedule"',
-        '',
-        workCSV,
-        '',
-        '"Fairness Summary"',
-        '',
-        '"' + fairnessText.replace(/"/g,'""') + '"'
-      ].join('\n');
-
-      const blob = new Blob([combined], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = 'schedule.csv'; a.click();
-      URL.revokeObjectURL(url);
+      });
     });
 
-    /* ===== JSON import/export ===== */
-    exportJsonBtn.addEventListener('click', ()=>{
-      const payload = { peopleList, kitchenTasks, workTasks, availability, meta: { exportedAt: new Date().toISOString() } };
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = 'scheduler-export.json'; a.click();
-      URL.revokeObjectURL(url);
-    });
+    const rows=Object.entries(totalAssignments).sort((a,b)=>b[1]-a[1]);
+    fairnessContent.innerHTML=rows.map(([name,count])=>`<div style="display:flex;justify-content:space-between;padding:2px 0;"><strong>${escapeHtml(name)}</strong><span>${count}</span></div>`).join('');
+    fairnessSummaryBox.style.display='block'; fairnessContent.setAttribute('aria-hidden','false');
+  }
 
-    importFileInput.addEventListener('change', (ev)=>{
-      const f = ev.target.files[0];
-      if(!f) return;
-      if(!confirm('Importing will replace current data. Continue?')) { ev.target.value=''; return; }
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try{
-          const obj = JSON.parse(e.target.result);
-          peopleList = obj.peopleList || [];
-          kitchenTasks = obj.kitchenTasks || [];
-          workTasks = obj.workTasks || [];
-          availability = obj.availability || {};
-          saveData();
-          ensureAvailabilityStructure();
-          renderPeople(); renderTasks(kitchenTasks,kitchenTaskTable); renderTasks(workTasks,workTaskTable); renderAvailability();
-          alert('Import completed');
-        }catch(err){
-          alert('Invalid JSON file');
-        }
-      };
-      reader.readAsText(f);
-      ev.target.value = '';
-    });
-    importJsonBtn.addEventListener('click', ()=> importFileInput.click());
+  // ===== CSV DOWNLOAD ======
+  downloadBtn.addEventListener('click',()=>{
+    function tableToCSV(table){ if(!table||!table.rows) return ''; const lines=[]; for(let r=0;r<table.rows.length;r++){ const cells=table.rows[r].cells; const row=[]; for(let c=0;c<cells.length;c++) row.push('"'+(cells[c].textContent||'').replace(/"/g,'""')+'"'); lines.push(row.join(',')); } return lines.join('\n'); }
+    const kitchenCSV=tableToCSV(kitchenScheduleTable); const workCSV=tableToCSV(workScheduleTable);
+    const fairnessText=Array.from(document.querySelectorAll('#fairness-content div')).map(d=>d.textContent).join('\n');
+    const combined=['"Kitchen Schedule"','','',kitchenCSV,'','"Work Schedule"','','',workCSV,'','"Fairness Summary"','','"'+fairnessText.replace(/"/g,'""')+'"'].join('\n');
+    const blob=new Blob([combined],{type:'text/csv'}); const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download='schedule.csv'; a.click(); URL.revokeObjectURL(url);
+  });
 
-    /* ===== Dark mode toggle ===== */
-    darkmodeBtn.addEventListener('click', ()=> {
-      const next = !document.body.classList.contains('dark');
-      setDarkMode(next);
-    });
+  // ===== JSON IMPORT/EXPORT ======
+  exportJsonBtn.addEventListener('click',()=>{
+    const payload={peopleList,kitchenTasks,workTasks,availability,meta:{exportedAt:new Date().toISOString()}};
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download='scheduler-export.json'; a.click(); URL.revokeObjectURL(url);
+  });
 
-    /* ===== Reset ===== */
-    resetAllBtn.addEventListener('click', ()=>{
-      if(!confirm('Are you sure you want to reset ALL saved data?')) return;
-      localStorage.removeItem(STORAGE_KEYS.people); localStorage.removeItem(STORAGE_KEYS.kitchen);
-      localStorage.removeItem(STORAGE_KEYS.work); localStorage.removeItem(STORAGE_KEYS.availability);
-      localStorage.removeItem(STORAGE_KEYS.dark);
-      peopleList = []; kitchenTasks = []; workTasks = []; availability = {};
-      renderPeople(); renderTasks(kitchenTasks,kitchenTaskTable); renderTasks(workTasks,workTaskTable); renderAvailability();
-      kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessSummaryBox.style.display='none';
-      alert('All data cleared.');
-    });
+  importFileInput.addEventListener('change',ev=>{
+    const f=ev.target.files[0]; if(!f) return;
+    if(!confirm('Importing will replace current data. Continue?')){ ev.target.value=''; return; }
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        const obj=JSON.parse(e.target.result); peopleList=obj.peopleList||[]; kitchenTasks=obj.kitchenTasks||[]; workTasks=obj.workTasks||[]; availability=obj.availability||{};
+        saveData(); ensureAvailabilityStructure(); renderPeople(); renderTasks(kitchenTasks,kitchenTaskTable); renderTasks(workTasks,workTaskTable); renderAvailability();
+        alert('Import completed');
+      }catch(err){ alert('Invalid JSON file'); }
+    };
+    reader.readAsText(f); ev.target.value='';
+  });
+  importJsonBtn.addEventListener('click',()=>importFileInput.click());
 
-    /* ===== Initial render ===== */
-    seedDefaultKitchenTasks();
-    ensureAvailabilityStructure();
-    renderPeople();
-    renderTasks(kitchenTasks, kitchenTaskTable);
-    renderTasks(workTasks, workTaskTable);
-    renderAvailability();
+  // ===== DARK MODE ======
+  darkmodeBtn.addEventListener('click',()=>{ setDarkMode(!document.body.classList.contains('dark')); });
 
-    document.querySelectorAll('button').forEach(b => { if(!b.type) b.type='button'; });
-  </script>
+  // ===== RESET ======
+  resetAllBtn.addEventListener('click',()=>{
+    if(!confirm('Are you sure you want to reset ALL saved data?')) return;
+    localStorage.removeItem(STORAGE_KEYS.people); localStorage.removeItem(STORAGE_KEYS.kitchen);
+    localStorage.removeItem(STORAGE_KEYS.work); localStorage.removeItem(STORAGE_KEYS.availability); localStorage.removeItem(STORAGE_KEYS.dark);
+    peopleList=[]; kitchenTasks=[]; workTasks=[]; availability={};
+    renderPeople(); renderTasks(kitchenTasks,kitchenTaskTable); renderTasks(workTasks,workTaskTable); renderAvailability();
+    kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessSummaryBox.style.display='none';
+  });
+
+  // ===== INITIALIZE ======
+  renderPeople(); renderTasks(kitchenTasks,kitchenTaskTable); renderTasks(workTasks,workTaskTable); renderAvailability(); seedDefaultKitchenTasks();
+</script>
 </body>
 </html>
