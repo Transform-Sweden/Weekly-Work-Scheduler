@@ -592,7 +592,8 @@ function sortCandidatesByFairness(candidates, taskName){
               if(eligible.length === 0) eligible = peopleList.filter(p => !dailyAssignedKitchen[day].has(p.name));
               if(eligible.length === 0) eligible = peopleList.slice();
 
-              const chosen = pickCandidate(eligible);
+              const sorted = sortCandidatesByFairness(eligible, sub); // pass the task name!
+const chosen = sorted.length ? sorted[0] : null;
               if(!chosen) continue;
 
               totalAssignments[chosen.name] += 1;
