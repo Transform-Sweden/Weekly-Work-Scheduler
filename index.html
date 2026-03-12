@@ -509,7 +509,7 @@
       const lastWorkDay = Object.fromEntries(peopleList.map(p=>[p.name, null]));
       const lastTaskByPerson = Object.fromEntries(peopleList.map(p=>[p.name, null]));
 
-function sortCandidatesByFairness(candidates){
+function sortCandidatesByFairness(candidates, taskName){
   if(!candidates || candidates.length===0) return [];
 
   const shuffled = shuffle(candidates.slice());
@@ -527,25 +527,28 @@ function sortCandidatesByFairness(candidates){
     let aScore = aTotal;
     let bScore = bTotal;
 
-    // Strong priority for people with the lowest assignments
+    // prioritize people with lowest total work
     if(aTotal === minLoad) aScore -= 1.2;
     if(bTotal === minLoad) bScore -= 1.2;
 
-    // Boost people below average
+    // boost below-average load
     if(aTotal < avg) aScore -= 0.6;
     if(bTotal < avg) bScore -= 0.6;
 
-    // Small penalty if already near max load
+    // avoid repeating same task
+    if(lastTaskByPerson[a.name] === taskName) aScore += 1.0;
+    if(lastTaskByPerson[b.name] === taskName) bScore += 1.0;
+
+    // avoid people with max load
     if(aTotal === maxLoad) aScore += 0.6;
     if(bTotal === maxLoad) bScore += 0.6;
 
-    // Soft penalty for recent work duty
+    // slight penalty for recent work duty
     if(lastWorkDay[a.name]) aScore += 0.3;
     if(lastWorkDay[b.name]) bScore += 0.3;
 
     if(aScore !== bScore) return aScore - bScore;
 
-    // final random tie-breaker
     return Math.random() - 0.5;
   });
 
