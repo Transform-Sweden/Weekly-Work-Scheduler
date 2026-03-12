@@ -597,6 +597,7 @@ function sortCandidatesByFairness(candidates, taskName){
 
               totalAssignments[chosen.name] += 1;
               dailyAssignedKitchen[day].add(chosen.name);
+              lastTaskByPerson[chosen.name] = sub;
 
               const row = kRows[`${day}-${sub}`];
               const idx = nameIndex[chosen.name];
