@@ -508,20 +508,48 @@
       const dailyAssignedWork = Object.fromEntries(days.map(d=>[d,new Set()]));
       const lastWorkDay = Object.fromEntries(peopleList.map(p=>[p.name, null]));
 
-      function sortCandidatesByFairness(candidates){
-        if(!candidates || candidates.length===0) return [];
-        const avg = Object.values(totalAssignments).reduce((a,b)=>a+b,0) / Math.max(1, peopleList.length);
-        const shuffled = shuffle(candidates.slice());
-        shuffled.sort((a,b)=>{
-          const ta = totalAssignments[a.name];
-          const tb = totalAssignments[b.name];
-          const aScore = ta + (ta < avg ? -0.25 : 0);
-          const bScore = tb + (tb < avg ? -0.25 : 0);
-          if(aScore !== bScore) return aScore - bScore;
-          return Math.random() < 0.5 ? -1 : 1;
-        });
-        return shuffled;
-      }
+function sortCandidatesByFairness(candidates){
+  if(!candidates || candidates.length===0) return [];
+
+  const shuffled = shuffle(candidates.slice());
+
+  const totals = Object.values(totalAssignments);
+  const avg = totals.reduce((a,b)=>a+b,0) / Math.max(1, totals.length);
+  const minLoad = Math.min(...totals);
+  const maxLoad = Math.max(...totals);
+
+  shuffled.sort((a,b)=>{
+
+    let aTotal = totalAssignments[a.name];
+    let bTotal = totalAssignments[b.name];
+
+    let aScore = aTotal;
+    let bScore = bTotal;
+
+    // Strong priority for people with the lowest assignments
+    if(aTotal === minLoad) aScore -= 1.2;
+    if(bTotal === minLoad) bScore -= 1.2;
+
+    // Boost people below average
+    if(aTotal < avg) aScore -= 0.6;
+    if(bTotal < avg) bScore -= 0.6;
+
+    // Small penalty if already near max load
+    if(aTotal === maxLoad) aScore += 0.6;
+    if(bTotal === maxLoad) bScore += 0.6;
+
+    // Soft penalty for recent work duty
+    if(lastWorkDay[a.name]) aScore += 0.3;
+    if(lastWorkDay[b.name]) bScore += 0.3;
+
+    if(aScore !== bScore) return aScore - bScore;
+
+    // final random tie-breaker
+    return Math.random() - 0.5;
+  });
+
+  return shuffled;
+}
 
       function pickCandidate(candidates){
         const sorted = sortCandidatesByFairness(candidates);
