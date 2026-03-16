@@ -660,9 +660,11 @@ const chosen = sorted.length ? sorted[0] : null;
             return true;
           });
 
-          if(available.length === 0){
-            available = peopleList.filter(p=>{
-              const personAvail = availability[p.name] && availability[p.name][day];
+if(available.length === 0){
+  available = peopleList.filter(p=>{
+    if(!weeklyWorkDutyPeople.has(p.name)) return false;
+
+    const personAvail = availability[p.name] && availability[p.name][day];
               if(!personAvail) return false;
               if(!personAvail['Work Duty']) return false;
               if(task.genderRequired && task.genderRequired !== 'Any' && p.gender !== task.genderRequired) return false;
