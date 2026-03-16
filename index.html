@@ -545,6 +545,10 @@ function sortCandidatesByFairness(candidates, taskName){
 
     let aScore = aTotal;
     let bScore = bTotal;
+    
+    // penalize weekly work duty people for kitchen tasks
+if(taskName && weeklyWorkDutyPeople.has(a.name)) aScore += 1.5;
+if(taskName && weeklyWorkDutyPeople.has(b.name)) bScore += 1.5;
 
     // prioritize people with lowest total work
     if(aTotal === minLoad) aScore -= 1.2;
