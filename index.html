@@ -634,7 +634,8 @@ const chosen = sorted.length ? sorted[0] : null;
         workTasks.forEach(task=>{
           if(!task.days || !task.days[day]) return;
 
-          let available = peopleList.filter(p=>{
+       let available = peopleList.filter(p=>{
+  if(!weeklyWorkDutyPeople.has(p.name)) return false;
             const personAvail = availability[p.name] && availability[p.name][day];
             if(!personAvail) return false;
             if(!personAvail['Work Duty']) return false;
