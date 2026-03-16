@@ -555,10 +555,10 @@ function sortCandidatesByFairness(candidates, taskName){
   return shuffled;
 }
 
-      function pickCandidate(candidates){
-        const sorted = sortCandidatesByFairness(candidates);
-        return sorted.length ? sorted[0] : null;
-      }
+function pickCandidate(candidates, taskName){
+  const sorted = sortCandidatesByFairness(candidates, taskName);
+  return sorted.length ? sorted[0] : null;
+}
 
       // helper to get correct person cell in a kitchen row (handles rowspan / missing Day cell)
       function getKitchenPersonCell(row, personIdx){
