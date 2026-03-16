@@ -509,6 +509,24 @@
       const lastWorkDay = Object.fromEntries(peopleList.map(p=>[p.name, null]));
       const lastTaskByPerson = Object.fromEntries(peopleList.map(p=>[p.name, null]));
       const weeklyWorkDutyPeople = new Set();
+      // Determine weekly work duty people
+workTasks.forEach(task => {
+
+  let eligible = peopleList.filter(p=>{
+    if(task.genderRequired && task.genderRequired !== "Any" && p.gender !== task.genderRequired)
+      return false;
+    return true;
+  });
+
+  const sorted = sortCandidatesByFairness(eligible);
+
+  for(let i=0;i<task.count;i++){
+    if(sorted[i]){
+      weeklyWorkDutyPeople.add(sorted[i].name);
+    }
+  }
+
+});
 
 function sortCandidatesByFairness(candidates, taskName){
   if(!candidates || candidates.length===0) return [];
