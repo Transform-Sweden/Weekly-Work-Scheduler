@@ -508,6 +508,7 @@
       const dailyAssignedWork = Object.fromEntries(days.map(d=>[d,new Set()]));
       const lastWorkDay = Object.fromEntries(peopleList.map(p=>[p.name, null]));
       const lastTaskByPerson = Object.fromEntries(peopleList.map(p=>[p.name, null]));
+      const weeklyWorkDutyPeople = new Set();
 
 function sortCandidatesByFairness(candidates, taskName){
   if(!candidates || candidates.length===0) return [];
