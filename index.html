@@ -16,7 +16,8 @@
     section{ background:var(--card); padding:14px; margin-bottom:16px; border-radius:10px;
       box-shadow:0 2px 10px rgba(0,0,0,0.06); }
     .input-group{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-    input[type="text"], input[type="number"], select{ padding:6px 8px; border-radius:6px; border:1px solid #ddd; min-width:140px; }
+    input[type="text"], input[type="number"], select{ padding:6px 8px; border-radius:6px; border:1px solid #ccc; min-width:140px; background:var(--card); color:var(--text); }
+    body.dark input[type="text"], body.dark input[type="number"], body.dark select{ border-color:#444; }
     button{ padding:6px 10px; border-radius:6px; border:none; background:var(--accent); color:#fff; cursor:pointer; }
     button.secondary{ background:#6c757d; }
     button.danger{ background:var(--danger); }
@@ -24,20 +25,24 @@
     input[disabled]{ opacity:.6; cursor:not-allowed; }
     table{ width:100%; border-collapse:collapse; margin-top:10px; }
     th,td{ border:1px solid #e6e6e6; padding:8px; text-align:center; min-width:60px; }
-    th{ background:#f6f8fb; }
+    /* These cells keep a fixed light background in both themes, so their text stays a fixed
+       dark color too — otherwise dark-mode's light text becomes unreadable on a light box. */
+    th{ background:#f6f8fb; color:#222; }
     .remove-btn{ background:transparent; border:1px solid transparent; color:var(--danger); padding:4px 8px; border-radius:6px; }
     .remove-btn:hover{ background:var(--danger); color:#fff; }
     .person-list-item{ display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; border:1px solid #eee; margin-bottom:6px; justify-content:space-between; }
-    .kitchen-task{ background:#d1e7dd; }
-    .work-task{ background:#f8d7da; }
+    .kitchen-task{ background:#d1e7dd; color:#222; }
+    .work-task{ background:#f8d7da; color:#222; }
     .avail-cell{ min-width:80px; padding:6px; cursor:pointer; }
-    .fairness-box{ margin-top:12px; padding:8px; border-radius:8px; background:#eef6ff; }
+    .fairness-box{ margin-top:12px; padding:8px; border-radius:8px; background:#eef6ff; color:#222; }
     @media (max-width:768px){ .table-scroll{ overflow-x:auto; } }
     /* modal */
     .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.32); display:flex; align-items:flex-start; justify-content:center; z-index:9998; padding:20px; }
     .modal{ background:var(--card); color:var(--text); border-radius:8px; padding:12px; max-width:420px; width:100%; box-shadow:0 10px 40px rgba(0,0,0,0.25); }
     .sr-only{ position:absolute !important; left:-10000px; top:auto; width:1px; height:1px; overflow:hidden; }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
   <h1>Weekly Work Scheduler</h1>
@@ -112,6 +117,7 @@
     <button id="generate-btn" type="button">Generate Schedule</button>
     <button id="clear-btn" type="button" class="secondary">Clear Schedule</button>
     <button id="download-btn" type="button" class="secondary">Download CSV</button>
+    <button id="download-pdf-btn" type="button" class="secondary">Download PDF</button>
     <button id="darkmode-btn" type="button" class="secondary">Toggle Dark Mode</button>
   </div>
 
@@ -131,7 +137,7 @@
   <!-- Reset area -->
   <section style="background:#fff8e1;border:2px solid #ffeb3b;">
     <h3 style="color:#ff6f00; margin:0 0 6px 0;">⚠️ Reset All Data</h3>
-    <p style="margin:0 0 8px 0;">This will permanently clear all saved people, tasks and availability.</p>
+    <p style="margin:0 0 8px 0;color:#333;">This will permanently clear all saved people, tasks and availability.</p>
     <button id="reset-all-btn" type="button" class="danger">Reset All Data</button>
   </section>
 
@@ -173,6 +179,7 @@
     const generateBtn = document.getElementById('generate-btn');
     const clearBtn = document.getElementById('clear-btn');
     const downloadBtn = document.getElementById('download-btn');
+    const downloadPdfBtn = document.getElementById('download-pdf-btn');
     const darkmodeBtn = document.getElementById('darkmode-btn');
 
     const kitchenScheduleTable = document.getElementById('kitchen-schedule-table');
@@ -722,6 +729,93 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = 'schedule.csv'; a.click();
       URL.revokeObjectURL(url);
+    });
+
+    /* ===== PDF download (renders the actual schedule tables, colors and all) ===== */
+    downloadPdfBtn.addEventListener('click', async ()=>{
+      if(!kitchenScheduleTable.rows.length){ alert('Generate a schedule first.'); return; }
+      if(typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined'){
+        alert('PDF export needs an internet connection to load (it uses a small external library).');
+        return;
+      }
+
+      // Build an off-screen, always-light-themed copy of the schedule so the PDF
+      // looks the same whether the page is currently in dark mode or not.
+      const container = document.createElement('div');
+      container.style.position = 'fixed';
+      container.style.left = '-99999px';
+      container.style.top = '0';
+      container.style.background = '#ffffff';
+      container.style.color = '#111111';
+      container.style.padding = '24px';
+      container.style.width = 'fit-content';
+      container.style.fontFamily = 'Arial, sans-serif';
+
+      const addHeading = (text, size)=>{
+        const h = document.createElement('div');
+        h.textContent = text;
+        h.style.fontSize = size + 'px';
+        h.style.fontWeight = '700';
+        h.style.margin = '18px 0 8px 0';
+        container.appendChild(h);
+      };
+
+      addHeading('Weekly Work Scheduler', 20);
+
+      addHeading('Kitchen Schedule', 16);
+      container.appendChild(kitchenScheduleTable.cloneNode(true));
+
+      addHeading('Work Duties Schedule', 16);
+      container.appendChild(workScheduleTable.cloneNode(true));
+
+      if(fairnessSummaryBox.style.display !== 'none'){
+        addHeading('Fairness Summary (assignments per person)', 16);
+        const fairnessClone = fairnessContent.cloneNode(true);
+        fairnessClone.style.background = '#eef6ff';
+        fairnessClone.style.color = '#222';
+        fairnessClone.style.padding = '8px';
+        fairnessClone.style.borderRadius = '8px';
+        container.appendChild(fairnessClone);
+      }
+
+      document.body.appendChild(container);
+
+      try{
+        const canvas = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff' });
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+        const margin = 24;
+        const pageWidth = pdf.internal.pageSize.getWidth() - margin * 2;
+        const pageHeight = pdf.internal.pageSize.getHeight() - margin * 2;
+        const pxPerPtWidth = canvas.width / pageWidth;
+        const pageHeightInCanvasPx = pageHeight * pxPerPtWidth;
+
+        let sourceY = 0;
+        let firstPage = true;
+        while(sourceY < canvas.height){
+          const sliceHeightPx = Math.min(pageHeightInCanvasPx, canvas.height - sourceY);
+          const sliceCanvas = document.createElement('canvas');
+          sliceCanvas.width = canvas.width;
+          sliceCanvas.height = sliceHeightPx;
+          const ctx = sliceCanvas.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+          ctx.drawImage(canvas, 0, sourceY, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+          const sliceData = sliceCanvas.toDataURL('image/png');
+          const sliceHeightPt = sliceHeightPx / pxPerPtWidth;
+
+          if(!firstPage) pdf.addPage();
+          pdf.addImage(sliceData, 'PNG', margin, margin, pageWidth, sliceHeightPt);
+          firstPage = false;
+          sourceY += sliceHeightPx;
+        }
+
+        pdf.save('schedule.pdf');
+      } catch(err){
+        alert('Could not create the PDF. Please try again.');
+      } finally {
+        document.body.removeChild(container);
+      }
     });
 
     /* ===== JSON import/export ===== */
