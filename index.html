@@ -41,8 +41,8 @@
     .modal{ background:var(--card); color:var(--text); border-radius:8px; padding:12px; max-width:420px; width:100%; box-shadow:0 10px 40px rgba(0,0,0,0.25); }
     .sr-only{ position:absolute !important; left:-10000px; top:auto; width:1px; height:1px; overflow:hidden; }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
   <h1>Weekly Work Scheduler</h1>
@@ -114,6 +114,8 @@
   </section>
 
   <div class="input-group" style="margin-bottom:12px;">
+    <label for="week-label" class="sr-only">Week label</label>
+    <input id="week-label" type="text" placeholder="Week label (e.g. Week of Jul 6)" style="min-width:220px;" />
     <button id="generate-btn" type="button">Generate Schedule</button>
     <button id="clear-btn" type="button" class="secondary">Clear Schedule</button>
     <button id="download-btn" type="button" class="secondary">Download CSV</button>
@@ -123,6 +125,7 @@
 
   <section id="schedule-section">
     <h2 id="kitchen-schedule-h">Generated Kitchen Schedule</h2>
+    <div id="schedule-week-label" style="font-weight:600;color:var(--muted);margin:-4px 0 8px 0;"></div>
     <div style="overflow:auto;"><table id="kitchen-schedule-table" class="schedule-table" aria-labelledby="kitchen-schedule-h"></table></div>
 
     <h2 id="work-schedule-h">Generated Work Duties Schedule</h2>
@@ -145,11 +148,12 @@
 
   <script>
     /* ===== Data + Defaults ===== */
-    const STORAGE_KEYS = { people: 'ws_people', kitchen: 'ws_kitchen', work: 'ws_work', availability: 'ws_avail', dark: 'ws_dark' };
+    const STORAGE_KEYS = { people: 'ws_people', kitchen: 'ws_kitchen', work: 'ws_work', availability: 'ws_avail', dark: 'ws_dark', weekLabel: 'ws_weeklabel' };
     let peopleList = JSON.parse(localStorage.getItem(STORAGE_KEYS.people) || '[]');
     let kitchenTasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.kitchen) || '[]');
     let workTasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.work) || '[]');
     let availability = JSON.parse(localStorage.getItem(STORAGE_KEYS.availability) || '{}');
+    let lastScheduleMeta = null; // { weekLabel, fairnessRows } — filled in by generateSchedule()
 
     const days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
     const kitchenSubTasks = ["Breakfast","Lunch","Lunch Dishes","Dinner","Dinner Dishes"];
@@ -181,6 +185,8 @@
     const downloadBtn = document.getElementById('download-btn');
     const downloadPdfBtn = document.getElementById('download-pdf-btn');
     const darkmodeBtn = document.getElementById('darkmode-btn');
+    const weekLabelInput = document.getElementById('week-label');
+    const scheduleWeekLabelEl = document.getElementById('schedule-week-label');
 
     const kitchenScheduleTable = document.getElementById('kitchen-schedule-table');
     const workScheduleTable = document.getElementById('work-schedule-table');
@@ -200,6 +206,8 @@
     function saveData(){ localStorage.setItem(STORAGE_KEYS.people, JSON.stringify(peopleList)); localStorage.setItem(STORAGE_KEYS.kitchen, JSON.stringify(kitchenTasks)); localStorage.setItem(STORAGE_KEYS.work, JSON.stringify(workTasks)); localStorage.setItem(STORAGE_KEYS.availability, JSON.stringify(availability)); }
     function setDarkMode(enabled){ document.body.classList.toggle('dark', !!enabled); localStorage.setItem(STORAGE_KEYS.dark, enabled ? '1' : '0'); }
     setDarkMode(localStorage.getItem(STORAGE_KEYS.dark) === '1');
+    weekLabelInput.value = localStorage.getItem(STORAGE_KEYS.weekLabel) || '';
+    weekLabelInput.addEventListener('input', ()=> localStorage.setItem(STORAGE_KEYS.weekLabel, weekLabelInput.value));
     function shuffle(arr){ const a = arr.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
     function isStudent(p){ return p && p.role === 'Student'; }
 
@@ -475,10 +483,10 @@
 
     /* ===== Generator ===== */
     generateBtn.addEventListener('click', generateSchedule);
-    clearBtn.addEventListener('click', ()=>{ kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessSummaryBox.style.display='none'; });
+    clearBtn.addEventListener('click', ()=>{ kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessSummaryBox.style.display='none'; scheduleWeekLabelEl.textContent=''; lastScheduleMeta = null; });
 
     function generateSchedule(){
-      kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessContent.innerHTML=''; fairnessSummaryBox.style.display='none';
+      kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessContent.innerHTML=''; fairnessSummaryBox.style.display='none'; scheduleWeekLabelEl.textContent='';
       ensureAvailabilityStructure();
       saveData();
       if(peopleList.length === 0) { alert('Add people first.'); return; }
@@ -519,6 +527,8 @@
 
       // ----- Tracking structures -----
       const totalAssignments = Object.fromEntries(peopleList.map(p=>[p.name,0]));
+      const kitchenCountByPerson = Object.fromEntries(peopleList.map(p=>[p.name,0]));
+      const workCountByPerson = Object.fromEntries(peopleList.map(p=>[p.name,0]));
       const dailyAssignedKitchen = Object.fromEntries(days.map(d=>[d,new Set()]));
       const dailyAssignedWork = Object.fromEntries(days.map(d=>[d,new Set()]));
       // how many times each person has done each specific kitchen sub-task, used to rotate variety
@@ -624,6 +634,7 @@
               if(!chosen) continue;
 
               totalAssignments[chosen.name] += 1;
+              kitchenCountByPerson[chosen.name] += 1;
               dailyAssignedKitchen[day].add(chosen.name);
               kitchenTaskCounts[chosen.name][sub] += 1;
 
@@ -672,6 +683,7 @@
 
           chosenNames.forEach(name=>{
             totalAssignments[name] += 1;
+            workCountByPerson[name] += 1;
             dailyAssignedWork[day].add(name);
 
             const wRow = wRows[day];
@@ -685,11 +697,39 @@
         });
       });
 
-      // fairness summary
-      const rows = Object.entries(totalAssignments).sort((a,b)=>b[1]-a[1]);
-      fairnessContent.innerHTML = rows.map(([name,count]) => `<div style="display:flex;justify-content:space-between;padding:2px 0;"><strong>${escapeHtml(name)}</strong><span>${count}</span></div>`).join('');
+      // fairness summary — broken down by kitchen vs. work duty, not just a combined total
+      const fairnessRows = peopleList
+        .map(p => ({
+          name: p.name,
+          kitchen: kitchenCountByPerson[p.name] || 0,
+          work: workCountByPerson[p.name] || 0,
+          total: totalAssignments[p.name] || 0
+        }))
+        .sort((a,b)=> b.total - a.total);
+
+      fairnessContent.innerHTML =
+        '<table style="width:100%;border-collapse:collapse;">' +
+          '<thead><tr>' +
+            '<th style="text-align:left;padding:4px 6px;">Person</th>' +
+            '<th style="padding:4px 6px;">Kitchen</th>' +
+            '<th style="padding:4px 6px;">Work</th>' +
+            '<th style="padding:4px 6px;">Total</th>' +
+          '</tr></thead><tbody>' +
+          fairnessRows.map(r =>
+            `<tr>` +
+              `<td style="text-align:left;padding:3px 6px;">${escapeHtml(r.name)}</td>` +
+              `<td style="padding:3px 6px;">${r.kitchen}</td>` +
+              `<td style="padding:3px 6px;">${r.work}</td>` +
+              `<td style="padding:3px 6px;font-weight:600;">${r.total}</td>` +
+            `</tr>`
+          ).join('') +
+          '</tbody></table>';
       fairnessSummaryBox.style.display = 'block';
       fairnessContent.setAttribute('aria-hidden','false');
+
+      const weekLabel = weekLabelInput.value.trim();
+      scheduleWeekLabelEl.textContent = weekLabel;
+      lastScheduleMeta = { weekLabel, fairnessRows };
     }
 
     /* ===== CSV download ===== */
@@ -709,9 +749,16 @@
       }
       const kitchenCSV = tableToCSV(kitchenScheduleTable);
       const workCSV = tableToCSV(workScheduleTable);
-      const fairnessText = Array.from(document.querySelectorAll('#fairness-content div')).map(d => d.textContent).join('\n');
+      const fairnessRows = (lastScheduleMeta && lastScheduleMeta.fairnessRows) || [];
+      const fairnessCSV = [
+        '"Person","Kitchen","Work","Total"',
+        ...fairnessRows.map(r => `"${r.name.replace(/"/g,'""')}",${r.kitchen},${r.work},${r.total}`)
+      ].join('\n');
+      const weekLabel = (lastScheduleMeta && lastScheduleMeta.weekLabel) || '';
 
       const combined = [
+        weekLabel ? '"' + weekLabel.replace(/"/g,'""') + '"' : null,
+        weekLabel ? '' : null,
         '"Kitchen Schedule"',
         '',
         kitchenCSV,
@@ -722,8 +769,8 @@
         '',
         '"Fairness Summary"',
         '',
-        '"' + fairnessText.replace(/"/g,'""') + '"'
-      ].join('\n');
+        fairnessCSV
+      ].filter(line => line !== null).join('\n');
 
       const blob = new Blob([combined], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
@@ -731,101 +778,113 @@
       URL.revokeObjectURL(url);
     });
 
-    /* ===== PDF download (renders the actual schedule tables, colors and all) ===== */
-    downloadPdfBtn.addEventListener('click', async ()=>{
+    /* ===== PDF download — crisp vector text/tables (not a screenshot), colors preserved ===== */
+    downloadPdfBtn.addEventListener('click', ()=>{
       if(!kitchenScheduleTable.rows.length){ alert('Generate a schedule first.'); return; }
-      if(typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined'){
+      if(typeof window.jspdf === 'undefined'){
         alert('PDF export needs an internet connection to load (it uses a small external library).');
         return;
       }
 
-      // Build an off-screen, always-light-themed copy of the schedule so the PDF
-      // looks the same whether the page is currently in dark mode or not.
-      const container = document.createElement('div');
-      container.style.position = 'fixed';
-      container.style.left = '-99999px';
-      container.style.top = '0';
-      container.style.background = '#ffffff';
-      container.style.color = '#111111';
-      container.style.padding = '24px';
-      container.style.width = 'fit-content';
-      container.style.fontFamily = 'Arial, sans-serif';
+      const peopleNames = peopleList.map(p=>p.name);
+      const KITCHEN_FILL = [209,231,221]; // matches .kitchen-task on screen
+      const WORK_FILL = [248,215,218];    // matches .work-task on screen
+      const HEAD_FILL = [246,248,251];    // matches th on screen
 
-      const addHeading = (text, size)=>{
-        const h = document.createElement('div');
-        h.textContent = text;
-        h.style.fontSize = size + 'px';
-        h.style.fontWeight = '700';
-        h.style.margin = '18px 0 8px 0';
-        container.appendChild(h);
-      };
-
-      addHeading('Weekly Work Scheduler', 20);
-
-      addHeading('Kitchen Schedule', 16);
-      container.appendChild(kitchenScheduleTable.cloneNode(true));
-
-      addHeading('Work Duties Schedule', 16);
-      container.appendChild(workScheduleTable.cloneNode(true));
-
-      if(fairnessSummaryBox.style.display !== 'none'){
-        addHeading('Fairness Summary (assignments per person)', 16);
-        const fairnessClone = fairnessContent.cloneNode(true);
-        fairnessClone.style.background = '#eef6ff';
-        fairnessClone.style.color = '#222';
-        fairnessClone.style.padding = '8px';
-        fairnessClone.style.borderRadius = '8px';
-        container.appendChild(fairnessClone);
+      // Read straight from the live kitchen schedule table (Day/Slot columns are skipped
+      // for the checkmark-fill check since only person columns should get the color).
+      const kitchenHead = [['Day','Slot', ...peopleNames]];
+      const kitchenBody = [];
+      for(let r=0;r<kitchenScheduleTable.rows.length;r++){
+        const cells = kitchenScheduleTable.rows[r].cells;
+        kitchenBody.push(Array.from(cells).map(c => c.textContent || ''));
       }
 
-      document.body.appendChild(container);
+      const workHead = [['Day', ...peopleNames]];
+      const workBody = [];
+      for(let r=0;r<workScheduleTable.rows.length;r++){
+        const cells = workScheduleTable.rows[r].cells;
+        workBody.push(Array.from(cells).map(c => c.textContent || ''));
+      }
 
-      try{
-        const canvas = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff' });
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-        const margin = 24;
-        const pageWidth = pdf.internal.pageSize.getWidth() - margin * 2;
-        const pageHeight = pdf.internal.pageSize.getHeight() - margin * 2;
-        const pxPerPtWidth = canvas.width / pageWidth;
-        const pageHeightInCanvasPx = pageHeight * pxPerPtWidth;
+      const fairnessRows = (lastScheduleMeta && lastScheduleMeta.fairnessRows) || [];
+      const weekLabel = (lastScheduleMeta && lastScheduleMeta.weekLabel) || '';
 
-        let sourceY = 0;
-        let firstPage = true;
-        while(sourceY < canvas.height){
-          const sliceHeightPx = Math.min(pageHeightInCanvasPx, canvas.height - sourceY);
-          const sliceCanvas = document.createElement('canvas');
-          sliceCanvas.width = canvas.width;
-          sliceCanvas.height = sliceHeightPx;
-          const ctx = sliceCanvas.getContext('2d');
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
-          ctx.drawImage(canvas, 0, sourceY, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
-          const sliceData = sliceCanvas.toDataURL('image/png');
-          const sliceHeightPt = sliceHeightPx / pxPerPtWidth;
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+      const margin = 36;
+      let y = margin;
 
-          if(!firstPage) pdf.addPage();
-          pdf.addImage(sliceData, 'PNG', margin, margin, pageWidth, sliceHeightPt);
-          firstPage = false;
-          sourceY += sliceHeightPx;
+      doc.setFontSize(18);
+      doc.text('Weekly Work Scheduler' + (weekLabel ? '  —  ' + weekLabel : ''), margin, y);
+      y += 20;
+
+      doc.setFontSize(13);
+      doc.text('Kitchen Schedule', margin, y);
+      doc.autoTable({
+        head: kitchenHead,
+        body: kitchenBody,
+        startY: y + 8,
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 8, halign: 'center', cellPadding: 3 },
+        headStyles: { fillColor: HEAD_FILL, textColor: [30,30,30] },
+        didParseCell: (data)=>{
+          if(data.section === 'body' && data.column.index >= 2 && String(data.cell.raw).includes('✓')){
+            data.cell.styles.fillColor = KITCHEN_FILL;
+          }
         }
+      });
 
-        pdf.save('schedule.pdf');
-      } catch(err){
-        alert('Could not create the PDF. Please try again.');
-      } finally {
-        document.body.removeChild(container);
+      y = doc.lastAutoTable.finalY + 24;
+      if(y > doc.internal.pageSize.getHeight() - 120){ doc.addPage(); y = margin; }
+
+      doc.setFontSize(13);
+      doc.text('Work Duties Schedule', margin, y);
+      doc.autoTable({
+        head: workHead,
+        body: workBody,
+        startY: y + 8,
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 8, halign: 'center', cellPadding: 3 },
+        headStyles: { fillColor: HEAD_FILL, textColor: [30,30,30] },
+        didParseCell: (data)=>{
+          if(data.section === 'body' && data.column.index >= 1 && String(data.cell.raw).trim() !== ''){
+            data.cell.styles.fillColor = WORK_FILL;
+          }
+        }
+      });
+
+      y = doc.lastAutoTable.finalY + 24;
+      if(y > doc.internal.pageSize.getHeight() - 100){ doc.addPage(); y = margin; }
+
+      if(fairnessRows.length){
+        doc.setFontSize(13);
+        doc.text('Fairness Summary (assignments per person)', margin, y);
+        doc.autoTable({
+          head: [['Person','Kitchen','Work','Total']],
+          body: fairnessRows.map(r => [r.name, String(r.kitchen), String(r.work), String(r.total)]),
+          startY: y + 8,
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 9, halign: 'center', cellPadding: 4 },
+          headStyles: { fillColor: [238,246,255], textColor: [30,30,30] },
+          columnStyles: { 0: { halign: 'left' } }
+        });
       }
+
+      doc.save('schedule.pdf');
     });
 
     /* ===== JSON import/export ===== */
-    exportJsonBtn.addEventListener('click', ()=>{
-      const payload = { peopleList, kitchenTasks, workTasks, availability, meta: { exportedAt: new Date().toISOString() } };
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    function buildBackupPayload(){
+      return { peopleList, kitchenTasks, workTasks, availability, meta: { exportedAt: new Date().toISOString() } };
+    }
+    function downloadJsonBackup(filename){
+      const blob = new Blob([JSON.stringify(buildBackupPayload(), null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = 'scheduler-export.json'; a.click();
+      const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
       URL.revokeObjectURL(url);
-    });
+    }
+    exportJsonBtn.addEventListener('click', ()=> downloadJsonBackup('scheduler-export.json'));
 
     importFileInput.addEventListener('change', (ev)=>{
       const f = ev.target.files[0];
@@ -861,16 +920,22 @@
 
     /* ===== Reset ===== */
     resetAllBtn.addEventListener('click', ()=>{
-      if(!confirm('Are you sure you want to reset ALL saved data?')) return;
+      if(peopleList.length === 0 && kitchenTasks.length === 0 && workTasks.length === 0){
+        if(!confirm('Are you sure you want to reset ALL saved data?')) return;
+      } else {
+        if(!confirm('This will permanently clear all people, tasks and availability.\n\nA backup JSON file of your current data will be downloaded automatically first, so you can re-import it later if needed.\n\nContinue?')) return;
+        downloadJsonBackup('scheduler-backup-before-reset.json');
+      }
       localStorage.removeItem(STORAGE_KEYS.people); localStorage.removeItem(STORAGE_KEYS.kitchen);
       localStorage.removeItem(STORAGE_KEYS.work); localStorage.removeItem(STORAGE_KEYS.availability);
-      localStorage.removeItem(STORAGE_KEYS.dark);
+      localStorage.removeItem(STORAGE_KEYS.dark); localStorage.removeItem(STORAGE_KEYS.weekLabel);
       peopleList = []; kitchenTasks = []; workTasks = []; availability = {};
+      weekLabelInput.value = '';
       seedDefaultKitchenTasks(); // re-seed the fixed kitchen tasks right after a reset
       ensureAvailabilityStructure();
       renderPeople(); renderTasks(kitchenTasks,kitchenTaskTable,false); renderTasks(workTasks,workTaskTable,true); renderAvailability();
-      kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessSummaryBox.style.display='none';
-      alert('All data cleared.');
+      kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessSummaryBox.style.display='none'; scheduleWeekLabelEl.textContent=''; lastScheduleMeta = null;
+      alert('All data cleared. A backup of your previous data was downloaded before clearing.');
     });
 
     /* ===== Initial render ===== */
