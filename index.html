@@ -21,6 +21,7 @@
     button.secondary{ background:#6c757d; }
     button.danger{ background:var(--danger); }
     button[disabled]{ opacity:.6; cursor:not-allowed; }
+    input[disabled]{ opacity:.6; cursor:not-allowed; }
     table{ width:100%; border-collapse:collapse; margin-top:10px; }
     th,td{ border:1px solid #e6e6e6; padding:8px; text-align:center; min-width:60px; }
     th{ background:#f6f8fb; }
@@ -51,6 +52,11 @@
         <option value="Male">Male</option>
         <option value="Female">Female</option>
       </select>
+      <label for="person-role" class="sr-only">Student or Staff</label>
+      <select id="person-role" aria-label="Student or Staff">
+        <option value="Staff">Staff</option>
+        <option value="Student">Student</option>
+      </select>
       <button id="add-person-btn" type="button">Add Person</button>
       <button id="export-json-btn" type="button" class="secondary">Export JSON</button>
       <input id="import-json" type="file" accept=".json" style="display:none" />
@@ -61,15 +67,11 @@
 
   <section id="kitchen-section">
     <h2>Kitchen Tasks</h2>
-    <div class="input-group">
-      <input type="text" id="kitchen-task-name" placeholder="Enter task (e.g. Breakfast)"/>
-      <input type="number" id="kitchen-task-count" placeholder="People needed" min="1" value="1"/>
-      <button id="add-kitchen-task-btn" type="button">Add Task</button>
-    </div>
+    <p style="font-size:13px;color:var(--muted); margin:0 0 6px 0;">Kitchen tasks are fixed (Breakfast, Lunch, Lunch Dishes, Dinner, Dinner Dishes) — only counts and days can be changed. Students are not scheduled for Lunch or Dinner cooking.</p>
     <table id="kitchen-task-table" aria-label="Kitchen tasks table">
       <caption>List of kitchen tasks</caption>
       <thead>
-        <tr><th>Task</th><th>People Needed</th><th>Days Needed</th><th>Remove</th></tr>
+        <tr><th>Task</th><th>People Needed</th><th>Days Needed</th></tr>
       </thead>
       <tbody></tbody>
     </table>
@@ -103,7 +105,7 @@
         <tbody></tbody>
       </table>
     </div>
-    <p style="font-size:13px;color:var(--muted); margin-top:8px;">Click a cell to edit availability for that person/day (emoji = slot enabled).</p>
+    <p style="font-size:13px;color:var(--muted); margin-top:8px;">Click a cell to edit availability for that person/day (emoji = slot enabled). Work Duty and Lunch Dishes availability are linked, since they happen at the same time.</p>
   </section>
 
   <div class="input-group" style="margin-bottom:12px;">
@@ -147,16 +149,16 @@
     const kitchenSubTasks = ["Breakfast","Lunch","Lunch Dishes","Dinner","Dinner Dishes"];
     const allSlots = [...kitchenSubTasks, "Work Duty"];
     const slotEmoji = { "Breakfast":"🍳","Lunch":"🥗","Lunch Dishes":"🍽️","Dinner":"🍝","Dinner Dishes":"🧽","Work Duty":"⚙️" };
+    // Sub-tasks students are not scheduled for (actual cooking, not dishes)
+    const studentRestrictedSubTasks = ["Lunch","Dinner"];
 
     /* ===== DOM references ===== */
     const personInput = document.getElementById('person-name');
     const personGender = document.getElementById('person-gender');
+    const personRole = document.getElementById('person-role');
     const addPersonBtn = document.getElementById('add-person-btn');
     const peopleContainer = document.getElementById('people-list');
 
-    const kitchenTaskInput = document.getElementById('kitchen-task-name');
-    const kitchenTaskCount = document.getElementById('kitchen-task-count');
-    const addKitchenTaskBtn = document.getElementById('add-kitchen-task-btn');
     const kitchenTaskTable = document.getElementById('kitchen-task-table').querySelector('tbody');
 
     const workTaskInput = document.getElementById('work-task-name');
@@ -192,6 +194,7 @@
     function setDarkMode(enabled){ document.body.classList.toggle('dark', !!enabled); localStorage.setItem(STORAGE_KEYS.dark, enabled ? '1' : '0'); }
     setDarkMode(localStorage.getItem(STORAGE_KEYS.dark) === '1');
     function shuffle(arr){ const a = arr.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+    function isStudent(p){ return p && p.role === 'Student'; }
 
     /* ===== Ensure availability structure ===== */
     function ensureAvailabilityStructure(){
@@ -208,11 +211,17 @@
       Object.keys(availability).forEach(name => { if(!peopleList.find(p=>p.name===name)) delete availability[name]; });
     }
 
-    /* ===== Seed default kitchen tasks ===== */
+    /* ===== Kitchen tasks are fixed: Breakfast, Lunch, Lunch Dishes, Dinner, Dinner Dishes =====
+       This runs on every load AND after Reset All Data, and heals/normalizes the list so
+       exactly these five tasks always exist (in this order), whatever was there before. */
     function seedDefaultKitchenTasks(){
-      if(kitchenTasks && kitchenTasks.length > 0) return;
-      const defaults = kitchenSubTasks.map(name => ({ name, count: 1, days: Object.fromEntries(days.map(d=>[d,true])) }));
-      kitchenTasks = defaults;
+      kitchenSubTasks.forEach(name=>{
+        if(!kitchenTasks.find(t=>t.name===name)){
+          kitchenTasks.push({ name, count: 1, days: Object.fromEntries(days.map(d=>[d,true])) });
+        }
+      });
+      // drop anything that isn't one of the five fixed tasks, and keep a stable order
+      kitchenTasks = kitchenSubTasks.map(name => kitchenTasks.find(t=>t.name===name));
       saveData();
     }
 
@@ -223,7 +232,7 @@
         const div = document.createElement('div');
         div.className = 'person-list-item';
         const left = document.createElement('div');
-        left.textContent = `${p.name} (${p.gender})`;
+        left.textContent = `${p.name} (${p.gender}, ${p.role || 'Staff'})`;
         const btn = document.createElement('button');
         btn.type='button'; btn.className='remove-btn'; btn.textContent='Remove';
         btn.addEventListener('click', ()=>{
@@ -239,7 +248,8 @@
       });
     }
 
-    function renderTasks(taskArray, tbody){
+    function renderTasks(taskArray, tbody, hasRemoveColumn){
+      if(hasRemoveColumn === undefined) hasRemoveColumn = true;
       tbody.innerHTML = '';
       taskArray.forEach((task, idx)=>{
         const tr = document.createElement('tr');
@@ -267,10 +277,13 @@
         });
         tr.appendChild(daysTd);
 
-        const removeTd = document.createElement('td');
-        const btn = document.createElement('button'); btn.type='button'; btn.className='remove-btn'; btn.textContent='Remove';
-        btn.addEventListener('click', ()=>{ taskArray.splice(idx,1); saveData(); renderTasks(taskArray, tbody); });
-        removeTd.appendChild(btn); tr.appendChild(removeTd);
+        if(hasRemoveColumn){
+          const removeTd = document.createElement('td');
+          const btn = document.createElement('button'); btn.type='button'; btn.className='remove-btn'; btn.textContent='Remove';
+          btn.addEventListener('click', ()=>{ taskArray.splice(idx,1); saveData(); renderTasks(taskArray, tbody, hasRemoveColumn); });
+          removeTd.appendChild(btn);
+          tr.appendChild(removeTd);
+        }
 
         tbody.appendChild(tr);
       });
@@ -346,6 +359,7 @@
         form.appendChild(label);
 
         cb.addEventListener('change', (e) => {
+          // Work Duty and Lunch Dishes happen at the same time, so their availability is linked
           if(slot === 'Lunch Dishes' || slot === 'Work Duty'){
             const other = slot === 'Lunch Dishes' ? 'Work Duty' : 'Lunch Dishes';
             const others = form.querySelectorAll('input[type=checkbox]');
@@ -366,6 +380,7 @@
           const s = cb.dataset.slot;
           availability[personName][day][s] = cb.checked;
         });
+        // Work Duty and Lunch Dishes are the same time slot: keep them in sync
         const ld = !!availability[personName][day]['Lunch Dishes'];
         const wd = !!availability[personName][day]['Work Duty'];
         const both = ld || wd;
@@ -421,8 +436,9 @@
       if(!nameRaw) { alert('Name required'); return; }
       const name = nameRaw;
       const gender = personGender.value;
+      const role = personRole.value;
       if(peopleList.find(p=>p.name.toLowerCase() === name.toLowerCase())) { alert('Person already exists'); return; }
-      peopleList.push({ name, gender });
+      peopleList.push({ name, gender, role });
       availability[name] = availability[name] || {};
       days.forEach(d=> { availability[name][d] = availability[name][d] || {}; allSlots.forEach(s=>{ if(availability[name][d][s] === undefined) availability[name][d][s]=true; }); });
       saveData();
@@ -430,17 +446,8 @@
       personInput.value = '';
     });
 
-    addKitchenTaskBtn.addEventListener('click', ()=>{
-      const name = kitchenTaskInput.value.trim();
-      const count = Math.max(1, parseInt(kitchenTaskCount.value) || 1);
-      if(!name) { alert('Task name required'); return; }
-      const task = { name, count, days: {} };
-      days.forEach(d => task.days[d] = true);
-      kitchenTasks.push(task);
-      saveData();
-      renderTasks(kitchenTasks, kitchenTaskTable);
-      kitchenTaskInput.value=''; kitchenTaskCount.value=1;
-    });
+    // Kitchen tasks are fixed (Breakfast/Lunch/Lunch Dishes/Dinner/Dinner Dishes) and can't be
+    // added or removed through the UI — see seedDefaultKitchenTasks().
 
     addWorkTaskBtn.addEventListener('click', ()=>{
       const name = workTaskInput.value.trim();
@@ -451,7 +458,7 @@
       days.forEach(d=>task.days[d]=false);
       workTasks.push(task);
       saveData();
-      renderTasks(workTasks, workTaskTable);
+      renderTasks(workTasks, workTaskTable, true);
       workTaskInput.value=''; workTaskCount.value=1; workTaskGender.value='Any';
     });
 
@@ -459,7 +466,7 @@
     seedDefaultKitchenTasks();
     ensureAvailabilityStructure();
 
-    /* ===== Generator (improved balancing + stability) ===== */
+    /* ===== Generator ===== */
     generateBtn.addEventListener('click', generateSchedule);
     clearBtn.addEventListener('click', ()=>{ kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessSummaryBox.style.display='none'; });
 
@@ -503,105 +510,95 @@
         wRows[day] = row;
       });
 
+      // ----- Tracking structures -----
       const totalAssignments = Object.fromEntries(peopleList.map(p=>[p.name,0]));
       const dailyAssignedKitchen = Object.fromEntries(days.map(d=>[d,new Set()]));
       const dailyAssignedWork = Object.fromEntries(days.map(d=>[d,new Set()]));
-      const lastWorkDay = Object.fromEntries(peopleList.map(p=>[p.name, null]));
-      const lastTaskByPerson = Object.fromEntries(peopleList.map(p=>[p.name, null]));
-      const weeklyWorkDutyPeople = new Set();
-      // Determine weekly work duty people
-workTasks.forEach(task => {
-
-  let eligible = peopleList.filter(p=>{
-    if(task.genderRequired && task.genderRequired !== "Any" && p.gender !== task.genderRequired)
-      return false;
-    return true;
-  });
-
-  const sorted = sortCandidatesByFairness(eligible);
-
-  for(let i=0;i<task.count;i++){
-    if(sorted[i]){
-      weeklyWorkDutyPeople.add(sorted[i].name);
-    }
-  }
-
-});
-
-function sortCandidatesByFairness(candidates, taskName){
-  if(!candidates || candidates.length===0) return [];
-
-  const shuffled = shuffle(candidates.slice());
-
-  const totals = Object.values(totalAssignments);
-  const avg = totals.reduce((a,b)=>a+b,0) / Math.max(1, totals.length);
-  const minLoad = Math.min(...totals);
-  const maxLoad = Math.max(...totals);
-
-  shuffled.sort((a,b)=>{
-
-    let aTotal = totalAssignments[a.name];
-    let bTotal = totalAssignments[b.name];
-
-    let aScore = aTotal;
-    let bScore = bTotal;
-    
-    // penalize weekly work duty people for kitchen tasks
-if(taskName && weeklyWorkDutyPeople.has(a.name)) aScore += 1.5;
-if(taskName && weeklyWorkDutyPeople.has(b.name)) bScore += 1.5;
-
-    // prioritize people with lowest total work
-    if(aTotal === minLoad) aScore -= 1.2;
-    if(bTotal === minLoad) bScore -= 1.2;
-
-    // boost below-average load
-    if(aTotal < avg) aScore -= 0.6;
-    if(bTotal < avg) bScore -= 0.6;
-
-    // avoid repeating same task
-    if(lastTaskByPerson[a.name] === taskName) aScore += 1.0;
-    if(lastTaskByPerson[b.name] === taskName) bScore += 1.0;
-
-    // avoid people with max load
-    if(aTotal === maxLoad) aScore += 0.6;
-    if(bTotal === maxLoad) bScore += 0.6;
-
-    // slight penalty for recent work duty
-    if(lastWorkDay[a.name]) aScore += 0.3;
-    if(lastWorkDay[b.name]) bScore += 0.3;
-
-    if(aScore !== bScore) return aScore - bScore;
-
-    return Math.random() - 0.5;
-  });
-
-  return shuffled;
-}
-
-function pickCandidate(candidates, taskName){
-  const sorted = sortCandidatesByFairness(candidates, taskName);
-  return sorted.length ? sorted[0] : null;
-}
+      // how many times each person has done each specific kitchen sub-task, used to rotate variety
+      const kitchenTaskCounts = Object.fromEntries(peopleList.map(p=>[p.name, Object.fromEntries(kitchenSubTasks.map(s=>[s,0]))]));
 
       // helper to get correct person cell in a kitchen row (handles rowspan / missing Day cell)
       function getKitchenPersonCell(row, personIdx){
-        // If row includes the Day cell + Slot cell + person columns, cells.length === 2 + peopleCount
-        // That means person columns start at index 2. Otherwise they start at 1.
         const expectedWithDay = 2 + peopleList.length;
         const base = (row.cells.length === expectedWithDay) ? 2 : 1;
         return row.cells[base + personIdx];
       }
 
-      days.forEach(day=>{
-        const lunchRow = kRows[`${day}-Lunch Dishes`];
+      function personAssignedKitchenToday(name, day, sub){
+        const row = kRows[`${day}-${sub}`];
+        if(!row) return false;
+        const idx = nameIndex[name];
+        const cell = getKitchenPersonCell(row, idx);
+        return !!(cell && cell.textContent && cell.textContent.includes('✓'));
+      }
 
+      function sortCandidatesByFairness(candidates, kitchenSub){
+        if(!candidates || candidates.length===0) return [];
+        const shuffled = shuffle(candidates.slice());
+        const totals = Object.values(totalAssignments);
+        const avg = totals.reduce((a,b)=>a+b,0) / Math.max(1, totals.length);
+        const minLoad = Math.min(...totals);
+        const maxLoad = Math.max(...totals);
+
+        shuffled.sort((a,b)=>{
+          let aScore = totalAssignments[a.name];
+          let bScore = totalAssignments[b.name];
+
+          if(kitchenSub){
+            // rotate: the more times someone already did THIS specific task, the less likely they get it again
+            aScore += (kitchenTaskCounts[a.name][kitchenSub] || 0) * 1.5;
+            bScore += (kitchenTaskCounts[b.name][kitchenSub] || 0) * 1.5;
+            // leave kitchen slots for people who aren't locked into a recurring work duty
+            if(allPrimaryNames.has(a.name)) aScore += 1.2;
+            if(allPrimaryNames.has(b.name)) bScore += 1.2;
+          }
+
+          if(totalAssignments[a.name] === minLoad) aScore -= 1.2;
+          if(totalAssignments[b.name] === minLoad) bScore -= 1.2;
+          if(totalAssignments[a.name] < avg) aScore -= 0.6;
+          if(totalAssignments[b.name] < avg) bScore -= 0.6;
+          if(totalAssignments[a.name] === maxLoad) aScore += 0.6;
+          if(totalAssignments[b.name] === maxLoad) bScore += 0.6;
+
+          if(aScore !== bScore) return aScore - bScore;
+          return Math.random() - 0.5;
+        });
+
+        return shuffled;
+      }
+
+      // ----- Decide persistent (primary) assignees per work task -----
+      // Each work task keeps the same person(s) on it as much as it's needed, chosen fairly
+      // relative to everyone else's projected work-duty load.
+      const projectedLoad = Object.fromEntries(peopleList.map(p=>[p.name,0]));
+      const workPrimaryAssignees = {};
+      const allPrimaryNames = new Set();
+
+      workTasks.forEach((task, tIdx)=>{
+        const activeDayCount = days.filter(d => task.days && task.days[d]).length;
+        let eligible = peopleList.filter(p=>{
+          if(task.genderRequired && task.genderRequired !== 'Any' && p.gender !== task.genderRequired) return false;
+          return true;
+        });
+        const sorted = shuffle(eligible.slice()).sort((a,b)=> projectedLoad[a.name] - projectedLoad[b.name]);
+        const chosen = sorted.slice(0, task.count);
+        workPrimaryAssignees[tIdx] = chosen.map(p=>p.name);
+        chosen.forEach(p=>{
+          allPrimaryNames.add(p.name);
+          projectedLoad[p.name] += activeDayCount;
+        });
+      });
+
+      days.forEach(day=>{
         // KITCHEN
         kitchenSubTasks.forEach(sub=>{
           const matching = kitchenTasks.filter(t => t.name === sub && t.days && t.days[day]);
           if(matching.length === 0) return;
+          const studentsAllowed = !studentRestrictedSubTasks.includes(sub);
           matching.forEach(task=>{
             for(let s=0;s<task.count;s++){
               let eligible = peopleList.filter(p=>{
+                if(!studentsAllowed && isStudent(p)) return false;
                 const personAvail = availability[p.name] && availability[p.name][day];
                 if(!personAvail) return false;
                 if(!personAvail[sub]) return false;
@@ -610,18 +607,18 @@ function pickCandidate(candidates, taskName){
               });
 
               if(eligible.length === 0){
-                eligible = peopleList.filter(p => availability[p.name] && availability[p.name][day] && availability[p.name][day][sub] && !dailyAssignedKitchen[day].has(p.name));
+                eligible = peopleList.filter(p => (studentsAllowed || !isStudent(p)) && availability[p.name] && availability[p.name][day] && availability[p.name][day][sub] && !dailyAssignedKitchen[day].has(p.name));
               }
-              if(eligible.length === 0) eligible = peopleList.filter(p => !dailyAssignedKitchen[day].has(p.name));
-              if(eligible.length === 0) eligible = peopleList.slice();
+              if(eligible.length === 0) eligible = peopleList.filter(p => (studentsAllowed || !isStudent(p)) && !dailyAssignedKitchen[day].has(p.name));
+              if(eligible.length === 0) eligible = peopleList.filter(p => studentsAllowed || !isStudent(p));
 
-              const sorted = sortCandidatesByFairness(eligible, sub); // pass the task name!
-const chosen = sorted.length ? sorted[0] : null;
+              const sorted = sortCandidatesByFairness(eligible, sub);
+              const chosen = sorted.length ? sorted[0] : null;
               if(!chosen) continue;
 
               totalAssignments[chosen.name] += 1;
               dailyAssignedKitchen[day].add(chosen.name);
-              lastTaskByPerson[chosen.name] = sub;
+              kitchenTaskCounts[chosen.name][sub] += 1;
 
               const row = kRows[`${day}-${sub}`];
               const idx = nameIndex[chosen.name];
@@ -635,63 +632,49 @@ const chosen = sorted.length ? sorted[0] : null;
         });
 
         // WORK
-        workTasks.forEach(task=>{
+        workTasks.forEach((task, tIdx)=>{
           if(!task.days || !task.days[day]) return;
 
-       let available = peopleList.filter(p=>{
-  if(!weeklyWorkDutyPeople.has(p.name)) return false;
+          function isAvailableToday(p){
             const personAvail = availability[p.name] && availability[p.name][day];
             if(!personAvail) return false;
             if(!personAvail['Work Duty']) return false;
-            if(lunchRow){
-              const pi = nameIndex[p.name];
-              // lunchRow always has the Day cell when built (we inserted Day in first sub-row),
-              // so person columns for lunchRow are at index 2 + pi
-              const c = lunchRow.cells[2 + pi];
-              if(c && c.textContent && c.textContent.includes('✓')) return false;
-            }
             if(task.genderRequired && task.genderRequired !== 'Any' && p.gender !== task.genderRequired) return false;
-            const yIdx = days.indexOf(day) - 1;
-            if(yIdx >= 0){
-              const yesterday = days[yIdx];
-              if(lastWorkDay[p.name] === yesterday) return false;
-            }
             if(dailyAssignedWork[day].has(p.name)) return false;
+            // Work Duty and Lunch Dishes happen at the same time, so they can't overlap
+            if(personAssignedKitchenToday(p.name, day, 'Lunch Dishes')) return false;
             return true;
+          }
+
+          const chosenNames = [];
+          const primaries = workPrimaryAssignees[tIdx] || [];
+          primaries.forEach(name=>{
+            if(chosenNames.length >= task.count) return;
+            const person = peopleList.find(p=>p.name===name);
+            if(person && isAvailableToday(person)) chosenNames.push(name);
           });
 
-if(available.length === 0){
-  available = peopleList.filter(p=>{
-    if(!weeklyWorkDutyPeople.has(p.name)) return false;
-
-    const personAvail = availability[p.name] && availability[p.name][day];
-              if(!personAvail) return false;
-              if(!personAvail['Work Duty']) return false;
-              if(task.genderRequired && task.genderRequired !== 'Any' && p.gender !== task.genderRequired) return false;
-              if(dailyAssignedWork[day].has(p.name)) return false;
-              return true;
-            });
+          if(chosenNames.length < task.count){
+            const fallbackPool = peopleList.filter(p => !chosenNames.includes(p.name) && isAvailableToday(p));
+            const sortedFallback = sortCandidatesByFairness(fallbackPool);
+            for(const cand of sortedFallback){
+              if(chosenNames.length >= task.count) break;
+              chosenNames.push(cand.name);
+            }
           }
-          if(available.length === 0) return;
 
-          const sorted = sortCandidatesByFairness(available);
-          const chosenSet = new Set();
-          for(let i=0;i<task.count;i++){
-            const chosen = sorted.find(c => !chosenSet.has(c.name)) || sorted[0];
-            if(!chosen) continue;
-            chosenSet.add(chosen.name);
-            totalAssignments[chosen.name] += 1;
-            lastWorkDay[chosen.name] = day;
-            dailyAssignedWork[day].add(chosen.name);
+          chosenNames.forEach(name=>{
+            totalAssignments[name] += 1;
+            dailyAssignedWork[day].add(name);
 
             const wRow = wRows[day];
-            const personIdx = nameIndex[chosen.name];
+            const personIdx = nameIndex[name];
             const cell = wRow.cells[1 + personIdx];
             if(cell){
               cell.textContent = (cell.textContent ? cell.textContent + ', ' : '') + task.name;
               cell.className = 'work-task';
             }
-          }
+          });
         });
       });
 
@@ -702,7 +685,7 @@ if(available.length === 0){
       fairnessContent.setAttribute('aria-hidden','false');
     }
 
-    /* ===== CSV download (fixed) ===== */
+    /* ===== CSV download ===== */
     downloadBtn.addEventListener('click', ()=>{
       function tableToCSV(table){
         if(!table || !table.rows || table.rows.length===0) return '';
@@ -762,9 +745,10 @@ if(available.length === 0){
           kitchenTasks = obj.kitchenTasks || [];
           workTasks = obj.workTasks || [];
           availability = obj.availability || {};
+          seedDefaultKitchenTasks(); // enforce the fixed kitchen task list even on import
           saveData();
           ensureAvailabilityStructure();
-          renderPeople(); renderTasks(kitchenTasks,kitchenTaskTable); renderTasks(workTasks,workTaskTable); renderAvailability();
+          renderPeople(); renderTasks(kitchenTasks,kitchenTaskTable,false); renderTasks(workTasks,workTaskTable,true); renderAvailability();
           alert('Import completed');
         }catch(err){
           alert('Invalid JSON file');
@@ -788,7 +772,9 @@ if(available.length === 0){
       localStorage.removeItem(STORAGE_KEYS.work); localStorage.removeItem(STORAGE_KEYS.availability);
       localStorage.removeItem(STORAGE_KEYS.dark);
       peopleList = []; kitchenTasks = []; workTasks = []; availability = {};
-      renderPeople(); renderTasks(kitchenTasks,kitchenTaskTable); renderTasks(workTasks,workTaskTable); renderAvailability();
+      seedDefaultKitchenTasks(); // re-seed the fixed kitchen tasks right after a reset
+      ensureAvailabilityStructure();
+      renderPeople(); renderTasks(kitchenTasks,kitchenTaskTable,false); renderTasks(workTasks,workTaskTable,true); renderAvailability();
       kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessSummaryBox.style.display='none';
       alert('All data cleared.');
     });
@@ -797,8 +783,8 @@ if(available.length === 0){
     seedDefaultKitchenTasks();
     ensureAvailabilityStructure();
     renderPeople();
-    renderTasks(kitchenTasks, kitchenTaskTable);
-    renderTasks(workTasks, workTaskTable);
+    renderTasks(kitchenTasks, kitchenTaskTable, false);
+    renderTasks(workTasks, workTaskTable, true);
     renderAvailability();
 
     document.querySelectorAll('button').forEach(b => { if(!b.type) b.type='button'; });
