@@ -35,6 +35,10 @@
     .work-task{ background:#f8d7da; color:#222; }
     .avail-cell{ min-width:80px; padding:6px; cursor:pointer; }
     .fairness-box{ margin-top:12px; padding:8px; border-radius:8px; background:#eef6ff; color:#222; }
+    .editable-cell{ cursor:pointer; }
+    .editable-cell:hover{ box-shadow: inset 0 0 0 2px var(--accent); }
+    .cell-selected{ box-shadow: inset 0 0 0 3px var(--accent) !important; }
+    .cell-dragging{ opacity:.4; }
     @media (max-width:768px){ .table-scroll{ overflow-x:auto; } }
     /* modal */
     .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.32); display:flex; align-items:flex-start; justify-content:center; z-index:9998; padding:20px; }
@@ -125,6 +129,7 @@
 
   <section id="schedule-section">
     <h2 id="kitchen-schedule-h">Generated Kitchen Schedule</h2>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 6px 0;">Tip: click or tap a cell, then click another cell in the same row to swap them — or drag one onto the other with a mouse.</p>
     <div id="schedule-week-label" style="font-weight:600;color:var(--muted);margin:-4px 0 8px 0;"></div>
     <div style="overflow:auto;"><table id="kitchen-schedule-table" class="schedule-table" aria-labelledby="kitchen-schedule-h"></table></div>
 
@@ -148,7 +153,7 @@
 
   <script>
     /* ===== Data + Defaults ===== */
-    const STORAGE_KEYS = { people: 'ws_people', kitchen: 'ws_kitchen', work: 'ws_work', availability: 'ws_avail', dark: 'ws_dark', weekLabel: 'ws_weeklabel' };
+    const STORAGE_KEYS = { people: 'ws_people', kitchen: 'ws_kitchen', work: 'ws_work', availability: 'ws_avail', dark: 'ws_dark', weekLabel: 'ws_weeklabel', schedule: 'ws_schedule_snapshot' };
     let peopleList = JSON.parse(localStorage.getItem(STORAGE_KEYS.people) || '[]');
     let kitchenTasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.kitchen) || '[]');
     let workTasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.work) || '[]');
@@ -210,6 +215,177 @@
     weekLabelInput.addEventListener('input', ()=> localStorage.setItem(STORAGE_KEYS.weekLabel, weekLabelInput.value));
     function shuffle(arr){ const a = arr.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
     function isStudent(p){ return p && p.role === 'Student'; }
+
+    /* ===== Fairness table rendering (shared by initial generation and post-edit recompute) ===== */
+    function renderFairnessTable(fairnessRows){
+      fairnessContent.innerHTML =
+        '<table style="width:100%;border-collapse:collapse;">' +
+          '<thead><tr>' +
+            '<th style="text-align:left;padding:4px 6px;">Person</th>' +
+            '<th style="padding:4px 6px;">Kitchen</th>' +
+            '<th style="padding:4px 6px;">Work</th>' +
+            '<th style="padding:4px 6px;">Total</th>' +
+          '</tr></thead><tbody>' +
+          fairnessRows.map(r =>
+            `<tr>` +
+              `<td style="text-align:left;padding:3px 6px;">${escapeHtml(r.name)}</td>` +
+              `<td style="padding:3px 6px;">${r.kitchen}</td>` +
+              `<td style="padding:3px 6px;">${r.work}</td>` +
+              `<td style="padding:3px 6px;font-weight:600;">${r.total}</td>` +
+            `</tr>`
+          ).join('') +
+          '</tbody></table>';
+      fairnessSummaryBox.style.display = 'block';
+      fairnessContent.setAttribute('aria-hidden','false');
+    }
+
+    // Recomputes the fairness table straight from what's actually in the schedule tables
+    // right now — used after a manual swap, since a swap doesn't touch the generator's counters.
+    function recomputeFairnessAfterEdit(){
+      const kitchenCount = Object.fromEntries(peopleList.map(p=>[p.name,0]));
+      const workCount = Object.fromEntries(peopleList.map(p=>[p.name,0]));
+
+      Array.from(kitchenScheduleTable.querySelectorAll('td[data-day]')).forEach(cell=>{
+        const person = peopleList[parseInt(cell.dataset.personIndex,10)];
+        if(person && cell.textContent && cell.textContent.includes('✓')) kitchenCount[person.name]++;
+      });
+      Array.from(workScheduleTable.querySelectorAll('td[data-day]')).forEach(cell=>{
+        const person = peopleList[parseInt(cell.dataset.personIndex,10)];
+        if(person && cell.textContent && cell.textContent.trim() !== '') workCount[person.name]++;
+      });
+
+      const fairnessRows = peopleList
+        .map(p => ({ name: p.name, kitchen: kitchenCount[p.name]||0, work: workCount[p.name]||0, total: (kitchenCount[p.name]||0) + (workCount[p.name]||0) }))
+        .sort((a,b)=> b.total - a.total);
+
+      renderFairnessTable(fairnessRows);
+      if(lastScheduleMeta) lastScheduleMeta.fairnessRows = fairnessRows;
+    }
+
+    /* ===== Manual editing: tap-to-select-and-swap, plus drag-and-drop for mouse users =====
+       You can swap two cells within the SAME row (same day, and same task for kitchen) —
+       that keeps the meaning of "swap who's doing this" intact rather than creating odd states. */
+    function enableScheduleEditing(){
+      let selectedCell = null;
+      let draggedCell = null;
+
+      function cellInfo(cellEl, kind){
+        return { cellEl, kind, row: cellEl.parentElement, personIndex: parseInt(cellEl.dataset.personIndex,10) };
+      }
+
+      function applyCellStyle(info){
+        const cell = info.cellEl;
+        if(info.kind === 'kitchen') cell.className = cell.textContent.includes('✓') ? 'kitchen-task editable-cell' : 'editable-cell';
+        else cell.className = cell.textContent.trim() !== '' ? 'work-task editable-cell' : 'editable-cell';
+      }
+
+      function warnIfUnavailable(info, newText){
+        if(!newText || !newText.trim()) return null;
+        const person = peopleList[info.personIndex];
+        if(!person) return null;
+        const day = info.cellEl.dataset.day;
+        if(info.kind === 'kitchen'){
+          const sub = info.cellEl.dataset.sub;
+          const ok = availability[person.name] && availability[person.name][day] && availability[person.name][day][sub];
+          return ok ? null : `${person.name} marked themselves unavailable for ${sub} on ${day}.`;
+        }
+        const ok = availability[person.name] && availability[person.name][day] && availability[person.name][day]['Work Duty'];
+        return ok ? null : `${person.name} marked themselves unavailable for Work Duty on ${day}.`;
+      }
+
+      function completeSwap(a, b){
+        if(a.cellEl === b.cellEl) return;
+        if(a.row !== b.row){
+          alert('You can only swap assignments within the same row (same day, and same task for kitchen).');
+          return;
+        }
+        if(a.personIndex === b.personIndex) return;
+
+        const aNewText = b.cellEl.textContent;
+        const bNewText = a.cellEl.textContent;
+        const warnings = [warnIfUnavailable(a, aNewText), warnIfUnavailable(b, bNewText)].filter(Boolean);
+        if(warnings.length && !confirm(warnings.join('\n') + '\n\nSwap anyway?')) return;
+
+        a.cellEl.textContent = aNewText;
+        b.cellEl.textContent = bNewText;
+        applyCellStyle(a);
+        applyCellStyle(b);
+
+        recomputeFairnessAfterEdit();
+        saveScheduleSnapshot();
+      }
+
+      function onCellClick(cellEl, kind){
+        const info = cellInfo(cellEl, kind);
+        if(!selectedCell){
+          selectedCell = info;
+          cellEl.classList.add('cell-selected');
+          return;
+        }
+        const prev = selectedCell;
+        selectedCell = null;
+        prev.cellEl.classList.remove('cell-selected');
+        if(prev.cellEl === cellEl) return; // clicked the same cell again: just deselect
+        completeSwap(prev, info);
+      }
+
+      function markSelectable(cellEl, kind){
+        cellEl.classList.add('editable-cell');
+        cellEl.draggable = true;
+        cellEl.tabIndex = 0;
+        cellEl.setAttribute('role','button');
+        cellEl.setAttribute('aria-label','Click, tap, or drag to swap this assignment with another cell in the same row');
+
+        cellEl.addEventListener('click', ()=> onCellClick(cellEl, kind));
+        cellEl.addEventListener('keydown', (ev)=>{ if(ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); onCellClick(cellEl, kind); } });
+
+        cellEl.addEventListener('dragstart', (e)=>{
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain','');
+          draggedCell = cellInfo(cellEl, kind);
+          cellEl.classList.add('cell-dragging');
+        });
+        cellEl.addEventListener('dragend', ()=>{ cellEl.classList.remove('cell-dragging'); draggedCell = null; });
+        cellEl.addEventListener('dragover', (e)=> e.preventDefault());
+        cellEl.addEventListener('drop', (e)=>{
+          e.preventDefault();
+          if(!draggedCell) return;
+          const targetInfo = cellInfo(cellEl, kind);
+          const source = draggedCell;
+          draggedCell = null;
+          completeSwap(source, targetInfo);
+        });
+      }
+
+      Array.from(kitchenScheduleTable.querySelectorAll('td[data-day]')).forEach(cell => markSelectable(cell, 'kitchen'));
+      Array.from(workScheduleTable.querySelectorAll('td[data-day]')).forEach(cell => markSelectable(cell, 'work'));
+    }
+
+    /* ===== Persist the generated (and possibly manually edited) schedule across reloads ===== */
+    function saveScheduleSnapshot(){
+      const snapshot = {
+        weekLabel: (lastScheduleMeta && lastScheduleMeta.weekLabel) || '',
+        kitchenHtml: kitchenScheduleTable.innerHTML,
+        workHtml: workScheduleTable.innerHTML,
+        fairnessRows: (lastScheduleMeta && lastScheduleMeta.fairnessRows) || []
+      };
+      localStorage.setItem(STORAGE_KEYS.schedule, JSON.stringify(snapshot));
+    }
+
+    function restoreScheduleSnapshot(){
+      const raw = localStorage.getItem(STORAGE_KEYS.schedule);
+      if(!raw) return;
+      try{
+        const snap = JSON.parse(raw);
+        if(!snap.kitchenHtml || !snap.workHtml) return;
+        kitchenScheduleTable.innerHTML = snap.kitchenHtml;
+        workScheduleTable.innerHTML = snap.workHtml;
+        scheduleWeekLabelEl.textContent = snap.weekLabel || '';
+        lastScheduleMeta = { weekLabel: snap.weekLabel || '', fairnessRows: snap.fairnessRows || [] };
+        renderFairnessTable(snap.fairnessRows || []);
+        enableScheduleEditing();
+      } catch(e){ /* ignore a corrupted snapshot rather than breaking page load */ }
+    }
 
     /* ===== Ensure availability structure ===== */
     function ensureAvailabilityStructure(){
@@ -483,7 +659,7 @@
 
     /* ===== Generator ===== */
     generateBtn.addEventListener('click', generateSchedule);
-    clearBtn.addEventListener('click', ()=>{ kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessSummaryBox.style.display='none'; scheduleWeekLabelEl.textContent=''; lastScheduleMeta = null; });
+    clearBtn.addEventListener('click', ()=>{ kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessSummaryBox.style.display='none'; scheduleWeekLabelEl.textContent=''; lastScheduleMeta = null; localStorage.removeItem(STORAGE_KEYS.schedule); });
 
     function generateSchedule(){
       kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessContent.innerHTML=''; fairnessSummaryBox.style.display='none'; scheduleWeekLabelEl.textContent='';
@@ -506,7 +682,12 @@
           const row = kBody.insertRow();
           if(idx === 0){ const cell = row.insertCell(); cell.textContent = day; cell.rowSpan = kitchenSubTasks.length; }
           row.insertCell().textContent = sub;
-          peopleList.forEach(()=> row.insertCell());
+          peopleList.forEach((p, pIdx)=>{
+            const cell = row.insertCell();
+            cell.dataset.day = day;
+            cell.dataset.sub = sub;
+            cell.dataset.personIndex = pIdx;
+          });
           kRows[`${day}-${sub}`] = row;
         });
       });
@@ -521,7 +702,11 @@
       days.forEach(day=>{
         const row = wBody.insertRow();
         row.insertCell().textContent = day;
-        peopleList.forEach(()=> row.insertCell());
+        peopleList.forEach((p, pIdx)=>{
+          const cell = row.insertCell();
+          cell.dataset.day = day;
+          cell.dataset.personIndex = pIdx;
+        });
         wRows[day] = row;
       });
 
@@ -707,29 +892,14 @@
         }))
         .sort((a,b)=> b.total - a.total);
 
-      fairnessContent.innerHTML =
-        '<table style="width:100%;border-collapse:collapse;">' +
-          '<thead><tr>' +
-            '<th style="text-align:left;padding:4px 6px;">Person</th>' +
-            '<th style="padding:4px 6px;">Kitchen</th>' +
-            '<th style="padding:4px 6px;">Work</th>' +
-            '<th style="padding:4px 6px;">Total</th>' +
-          '</tr></thead><tbody>' +
-          fairnessRows.map(r =>
-            `<tr>` +
-              `<td style="text-align:left;padding:3px 6px;">${escapeHtml(r.name)}</td>` +
-              `<td style="padding:3px 6px;">${r.kitchen}</td>` +
-              `<td style="padding:3px 6px;">${r.work}</td>` +
-              `<td style="padding:3px 6px;font-weight:600;">${r.total}</td>` +
-            `</tr>`
-          ).join('') +
-          '</tbody></table>';
-      fairnessSummaryBox.style.display = 'block';
-      fairnessContent.setAttribute('aria-hidden','false');
+      renderFairnessTable(fairnessRows);
 
       const weekLabel = weekLabelInput.value.trim();
       scheduleWeekLabelEl.textContent = weekLabel;
       lastScheduleMeta = { weekLabel, fairnessRows };
+
+      enableScheduleEditing();
+      saveScheduleSnapshot();
     }
 
     /* ===== CSV download ===== */
@@ -929,6 +1099,7 @@
       localStorage.removeItem(STORAGE_KEYS.people); localStorage.removeItem(STORAGE_KEYS.kitchen);
       localStorage.removeItem(STORAGE_KEYS.work); localStorage.removeItem(STORAGE_KEYS.availability);
       localStorage.removeItem(STORAGE_KEYS.dark); localStorage.removeItem(STORAGE_KEYS.weekLabel);
+      localStorage.removeItem(STORAGE_KEYS.schedule);
       peopleList = []; kitchenTasks = []; workTasks = []; availability = {};
       weekLabelInput.value = '';
       seedDefaultKitchenTasks(); // re-seed the fixed kitchen tasks right after a reset
@@ -945,6 +1116,7 @@
     renderTasks(kitchenTasks, kitchenTaskTable, false);
     renderTasks(workTasks, workTaskTable, true);
     renderAvailability();
+    restoreScheduleSnapshot();
 
     document.querySelectorAll('button').forEach(b => { if(!b.type) b.type='button'; });
   </script>
