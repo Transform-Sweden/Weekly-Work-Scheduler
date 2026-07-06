@@ -750,9 +750,6 @@
             // rotate: the more times someone already did THIS specific task, the less likely they get it again
             aScore += (kitchenTaskCounts[a.name][kitchenSub] || 0) * 1.5;
             bScore += (kitchenTaskCounts[b.name][kitchenSub] || 0) * 1.5;
-            // leave kitchen slots for people who aren't locked into a recurring work duty
-            if(allPrimaryNames.has(a.name)) aScore += 1.2;
-            if(allPrimaryNames.has(b.name)) bScore += 1.2;
           }
 
           if(totalAssignments[a.name] === minLoad) aScore -= 1.2;
@@ -791,16 +788,30 @@
         });
       });
 
+      // Which primary work-duty people are actually needed on each specific day —
+      // used to keep them off Lunch Dishes (same time slot) only on the days it matters,
+      // instead of penalizing them out of kitchen rotation all week.
+      const workPrimariesByDay = Object.fromEntries(days.map(d=>[d, new Set()]));
+      workTasks.forEach((task, tIdx)=>{
+        const names = workPrimaryAssignees[tIdx] || [];
+        days.forEach(d=>{
+          if(task.days && task.days[d]) names.forEach(n => workPrimariesByDay[d].add(n));
+        });
+      });
+
       days.forEach(day=>{
         // KITCHEN
         kitchenSubTasks.forEach(sub=>{
           const matching = kitchenTasks.filter(t => t.name === sub && t.days && t.days[day]);
           if(matching.length === 0) return;
           const studentsAllowed = !studentRestrictedSubTasks.includes(sub);
+          // Only Lunch Dishes actually conflicts with Work Duty (same time slot)
+          const reservedForWork = (p)=> sub === 'Lunch Dishes' && workPrimariesByDay[day].has(p.name);
           matching.forEach(task=>{
             for(let s=0;s<task.count;s++){
               let eligible = peopleList.filter(p=>{
                 if(!studentsAllowed && isStudent(p)) return false;
+                if(reservedForWork(p)) return false;
                 const personAvail = availability[p.name] && availability[p.name][day];
                 if(!personAvail) return false;
                 if(!personAvail[sub]) return false;
@@ -809,10 +820,12 @@
               });
 
               if(eligible.length === 0){
-                eligible = peopleList.filter(p => (studentsAllowed || !isStudent(p)) && availability[p.name] && availability[p.name][day] && availability[p.name][day][sub] && !dailyAssignedKitchen[day].has(p.name));
+                eligible = peopleList.filter(p => (studentsAllowed || !isStudent(p)) && !reservedForWork(p) && availability[p.name] && availability[p.name][day] && availability[p.name][day][sub] && !dailyAssignedKitchen[day].has(p.name));
               }
-              if(eligible.length === 0) eligible = peopleList.filter(p => (studentsAllowed || !isStudent(p)) && !dailyAssignedKitchen[day].has(p.name));
+              if(eligible.length === 0) eligible = peopleList.filter(p => (studentsAllowed || !isStudent(p)) && !reservedForWork(p) && !dailyAssignedKitchen[day].has(p.name));
+              // absolute last resort: ignore the work-reservation and student restrictions rather than leave the slot empty
               if(eligible.length === 0) eligible = peopleList.filter(p => studentsAllowed || !isStudent(p));
+              if(eligible.length === 0) eligible = peopleList.slice();
 
               const sorted = sortCandidatesByFairness(eligible, sub);
               const chosen = sorted.length ? sorted[0] : null;
