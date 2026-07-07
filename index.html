@@ -532,6 +532,30 @@
       header.textContent = `${personName} — ${day}`;
       modal.appendChild(header);
 
+      const quickRow = document.createElement('div');
+      quickRow.style.display = 'flex';
+      quickRow.style.gap = '8px';
+      quickRow.style.flexWrap = 'wrap';
+      quickRow.style.marginBottom = '10px';
+
+      const markOffBtn = document.createElement('button');
+      markOffBtn.type = 'button'; markOffBtn.className = 'secondary';
+      markOffBtn.textContent = 'Mark Whole Day Unavailable';
+
+      const markOnBtn = document.createElement('button');
+      markOnBtn.type = 'button'; markOnBtn.className = 'secondary';
+      markOnBtn.textContent = 'Mark Whole Day Available';
+
+      const setAllCheckboxes = (value)=>{
+        form.querySelectorAll('input[type=checkbox]').forEach(cb => { cb.checked = value; });
+      };
+      markOffBtn.addEventListener('click', ()=> setAllCheckboxes(false));
+      markOnBtn.addEventListener('click', ()=> setAllCheckboxes(true));
+
+      quickRow.appendChild(markOffBtn);
+      quickRow.appendChild(markOnBtn);
+      modal.appendChild(quickRow);
+
       const form = document.createElement('div');
       form.style.display='grid';
       form.style.gridTemplateColumns='1fr 1fr';
