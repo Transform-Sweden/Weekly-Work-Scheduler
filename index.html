@@ -223,6 +223,7 @@
     setDarkMode(localStorage.getItem(STORAGE_KEYS.dark) === '1');
     weekLabelInput.value = localStorage.getItem(STORAGE_KEYS.weekLabel) || '';
     weekLabelInput.addEventListener('input', ()=> localStorage.setItem(STORAGE_KEYS.weekLabel, weekLabelInput.value));
+    weekLabelInput.addEventListener('keydown', (ev)=>{ if(ev.key === 'Enter'){ ev.preventDefault(); generateBtn.click(); } });
     function shuffle(arr){ const a = arr.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
     function isStudent(p){ return p && p.role === 'Student'; }
 
