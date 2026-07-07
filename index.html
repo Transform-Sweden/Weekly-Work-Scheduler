@@ -8,10 +8,20 @@
     :root{
       --bg:#f4f4f4; --card:#fff; --text:#222; --muted:#666; --accent:#007BFF;
       --danger:#ff4d4f; --success:#198754;
+      --th-bg:#f6f8fb; --th-text:#222;
+      --kitchen-bg:#d1e7dd; --kitchen-text:#0f3324;
+      --work-bg:#f8d7da; --work-text:#4a1218;
+      --fairness-bg:#eef6ff; --fairness-text:#222;
     }
     body { font-family: Inter, Arial, sans-serif; margin:20px auto; max-width:1200px; padding:0 12px;
       background:var(--bg); color:var(--text); transition:background .2s,color .2s;}
-    body.dark{ --bg:#0f0f10; --card:#161616; --text:#e6e6e6; --muted:#999; --accent:#4ea6ff; }
+    body.dark{
+      --bg:#0f0f10; --card:#161616; --text:#e6e6e6; --muted:#999; --accent:#4ea6ff;
+      --th-bg:#242424; --th-text:#e6e6e6;
+      --kitchen-bg:#1e3a2c; --kitchen-text:#bdeed2;
+      --work-bg:#3a1e24; --work-text:#f3c2c9;
+      --fairness-bg:#1c2a38; --fairness-text:#e6e6e6;
+    }
     h1,h2{ margin:0 0 8px 0; }
     section{ background:var(--card); padding:14px; margin-bottom:16px; border-radius:10px;
       box-shadow:0 2px 10px rgba(0,0,0,0.06); }
@@ -25,16 +35,16 @@
     input[disabled]{ opacity:.6; cursor:not-allowed; }
     table{ width:100%; border-collapse:collapse; margin-top:10px; }
     th,td{ border:1px solid #e6e6e6; padding:8px; text-align:center; min-width:60px; }
-    /* These cells keep a fixed light background in both themes, so their text stays a fixed
-       dark color too — otherwise dark-mode's light text becomes unreadable on a light box. */
-    th{ background:#f6f8fb; color:#222; }
+    body.dark th,body.dark td{ border-color:#333; }
+    th{ background:var(--th-bg); color:var(--th-text); }
     .remove-btn{ background:transparent; border:1px solid transparent; color:var(--danger); padding:4px 8px; border-radius:6px; }
     .remove-btn:hover{ background:var(--danger); color:#fff; }
     .person-list-item{ display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; border:1px solid #eee; margin-bottom:6px; justify-content:space-between; }
-    .kitchen-task{ background:#d1e7dd; color:#222; }
-    .work-task{ background:#f8d7da; color:#222; }
+    body.dark .person-list-item{ border-color:#333; }
+    .kitchen-task{ background:var(--kitchen-bg); color:var(--kitchen-text); }
+    .work-task{ background:var(--work-bg); color:var(--work-text); }
     .avail-cell{ min-width:80px; padding:6px; cursor:pointer; }
-    .fairness-box{ margin-top:12px; padding:8px; border-radius:8px; background:#eef6ff; color:#222; }
+    .fairness-box{ margin-top:12px; padding:8px; border-radius:8px; background:var(--fairness-bg); color:var(--fairness-text); }
     .editable-cell{ cursor:pointer; }
     .editable-cell:hover{ box-shadow: inset 0 0 0 2px var(--accent); }
     .cell-selected{ box-shadow: inset 0 0 0 3px var(--accent) !important; }
