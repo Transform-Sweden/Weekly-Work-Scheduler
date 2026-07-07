@@ -669,10 +669,6 @@
       saveData();
       renderPeople(); renderAvailability();
       personInput.value = '';
-      personInput.focus();
-    });
-    [personInput, personGender, personRole].forEach(el=>{
-      el.addEventListener('keydown', (ev)=>{ if(ev.key === 'Enter'){ ev.preventDefault(); addPersonBtn.click(); } });
     });
 
     // Kitchen tasks are fixed (Breakfast/Lunch/Lunch Dishes/Dinner/Dinner Dishes) and can't be
@@ -689,10 +685,6 @@
       saveData();
       renderTasks(workTasks, workTaskTable, true);
       workTaskInput.value=''; workTaskCount.value=1; workTaskGender.value='Any';
-      workTaskInput.focus();
-    });
-    [workTaskInput, workTaskCount, workTaskGender].forEach(el=>{
-      el.addEventListener('keydown', (ev)=>{ if(ev.key === 'Enter'){ ev.preventDefault(); addWorkTaskBtn.click(); } });
     });
 
     /* ===== Seed & init ===== */
