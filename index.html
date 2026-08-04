@@ -1567,12 +1567,18 @@
       const kitchenHead = [['Day','Slot', ...peopleNames]];
       const kitchenBody = [];
       days.forEach(day=>{
-        kitchenSubTasks.forEach(sub=>{
+        kitchenSubTasks.forEach((sub, subIdx)=>{
           const rowCells = Array.from(kitchenScheduleTable.querySelectorAll(`td[data-day="${day}"][data-sub="${sub}"]`));
           if(!rowCells.length) return;
           const byName = {};
           rowCells.forEach(c => { byName[c.dataset.personName] = c.textContent || ''; });
-          kitchenBody.push([day, sub, ...peopleNames.map(n => byName[n] || '')]);
+          const personCells = peopleNames.map(n => byName[n] || '');
+          if(subIdx === 0){
+            // Merge the Day cell down all 5 sub-task rows, same as the on-screen table
+            kitchenBody.push([{ content: day, rowSpan: kitchenSubTasks.length, styles: { valign: 'middle' } }, sub, ...personCells]);
+          } else {
+            kitchenBody.push([sub, ...personCells]);
+          }
         });
       });
 
