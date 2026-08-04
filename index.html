@@ -1495,7 +1495,27 @@
         }
         return lines.join('\n');
       }
-      const kitchenCSV = tableToCSV(kitchenScheduleTable);
+
+      // The on-screen kitchen table merges its "Day" cell down 5 rows (rowSpan), so only 1 of
+      // every 5 rows actually has a Day cell in the DOM. Scraping raw cells (like tableToCSV
+      // does) would shift the other 4 rows left by one column. Rebuild from data attributes instead.
+      function kitchenTableToCSV(table){
+        if(!table || !table.rows || table.rows.length===0) return '';
+        const peopleNames = peopleList.map(p=>p.name);
+        const lines = ['"Day","Slot",' + peopleNames.map(n=>`"${n.replace(/"/g,'""')}"`).join(',')];
+        days.forEach(day=>{
+          kitchenSubTasks.forEach(sub=>{
+            const rowCells = Array.from(table.querySelectorAll(`td[data-day="${day}"][data-sub="${sub}"]`));
+            if(!rowCells.length) return;
+            const byName = {};
+            rowCells.forEach(c => { byName[c.dataset.personName] = c.textContent || ''; });
+            const row = [`"${day}"`, `"${sub}"`, ...peopleNames.map(n => `"${(byName[n] || '').replace(/"/g,'""')}"`)];
+            lines.push(row.join(','));
+          });
+        });
+        return lines.join('\n');
+      }
+      const kitchenCSV = kitchenTableToCSV(kitchenScheduleTable);
       const workCSV = tableToCSV(workScheduleTable);
       const fairnessRows = (lastScheduleMeta && lastScheduleMeta.fairnessRows) || [];
       const fairnessCSV = [
@@ -1539,21 +1559,32 @@
       const WORK_FILL = [248,215,218];    // matches .work-task on screen
       const HEAD_FILL = [246,248,251];    // matches th on screen
 
-      // Read straight from the live kitchen schedule table (Day/Slot columns are skipped
-      // for the checkmark-fill check since only person columns should get the color).
+      // Rebuild rows from the data-day/data-sub/data-person-name attributes on each cell,
+      // rather than the raw row/cell positions. The on-screen kitchen table merges the "Day"
+      // cell down 5 rows (one per sub-task) using rowSpan, so only 1 of every 5 rows actually
+      // has a Day cell in the DOM — scraping raw cells directly would shift the other 4 left
+      // by one column (Slot text landing in the Day column, and so on).
       const kitchenHead = [['Day','Slot', ...peopleNames]];
       const kitchenBody = [];
-      for(let r=0;r<kitchenScheduleTable.rows.length;r++){
-        const cells = kitchenScheduleTable.rows[r].cells;
-        kitchenBody.push(Array.from(cells).map(c => c.textContent || ''));
-      }
+      days.forEach(day=>{
+        kitchenSubTasks.forEach(sub=>{
+          const rowCells = Array.from(kitchenScheduleTable.querySelectorAll(`td[data-day="${day}"][data-sub="${sub}"]`));
+          if(!rowCells.length) return;
+          const byName = {};
+          rowCells.forEach(c => { byName[c.dataset.personName] = c.textContent || ''; });
+          kitchenBody.push([day, sub, ...peopleNames.map(n => byName[n] || '')]);
+        });
+      });
 
       const workHead = [['Day', ...peopleNames]];
       const workBody = [];
-      for(let r=0;r<workScheduleTable.rows.length;r++){
-        const cells = workScheduleTable.rows[r].cells;
-        workBody.push(Array.from(cells).map(c => c.textContent || ''));
-      }
+      days.forEach(day=>{
+        const rowCells = Array.from(workScheduleTable.querySelectorAll(`td[data-day="${day}"]`));
+        if(!rowCells.length) return;
+        const byName = {};
+        rowCells.forEach(c => { byName[c.dataset.personName] = c.textContent || ''; });
+        workBody.push([day, ...peopleNames.map(n => byName[n] || '')]);
+      });
 
       const fairnessRows = (lastScheduleMeta && lastScheduleMeta.fairnessRows) || [];
       const weekLabel = (lastScheduleMeta && lastScheduleMeta.weekLabel) || '';
