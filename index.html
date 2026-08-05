@@ -175,13 +175,15 @@
 
   <section id="schedule-section">
     <h2 id="kitchen-schedule-h">Generated Kitchen Schedule</h2>
-    <p style="font-size:13px;color:var(--muted);margin:0 0 6px 0;">Tip: click or tap a cell, then click another cell in the same row to swap them — or drag one onto the other with a mouse. Double-click a cell to lock it (🔒) so it survives the next Generate.</p>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 6px 0;">Tip: click or tap a cell, then click another cell in the same row to swap them — or drag one onto the other with a mouse. Double-click a cell to lock it (🔒) so it survives the next Generate. Double-click a person's name in the header row to see all of their tasks for the week.</p>
     <div class="input-group" style="margin:0 0 8px 0;">
       <label for="regen-day-select" class="sr-only">Day to regenerate</label>
       <select id="regen-day-select" aria-label="Day to regenerate">
         <option>Mon</option><option>Tue</option><option>Wed</option><option>Thu</option><option>Fri</option><option>Sat</option><option>Sun</option>
       </select>
       <button id="regen-day-btn" type="button" class="secondary">Regenerate Just This Day</button>
+      <button id="regen-kitchen-only-btn" type="button" class="secondary">Regenerate Only Kitchen (Whole Week)</button>
+      <button id="regen-work-only-btn" type="button" class="secondary">Regenerate Only Work Duty (Whole Week)</button>
       <button id="undo-swap-btn" type="button" class="secondary">Undo Last Swap</button>
     </div>
     <div id="schedule-week-label" style="font-weight:600;color:var(--muted);margin:-4px 0 8px 0;"></div>
@@ -273,6 +275,8 @@
     const workScheduleTable = document.getElementById('work-schedule-table');
     const regenDaySelect = document.getElementById('regen-day-select');
     const regenDayBtn = document.getElementById('regen-day-btn');
+    const regenKitchenOnlyBtn = document.getElementById('regen-kitchen-only-btn');
+    const regenWorkOnlyBtn = document.getElementById('regen-work-only-btn');
     const undoSwapBtn = document.getElementById('undo-swap-btn');
     const scheduleWarningsBox = document.getElementById('schedule-warnings');
     const savedWeeksSelect = document.getElementById('saved-weeks-select');
@@ -534,6 +538,7 @@
         lastScheduleMeta = { weekLabel: snap.weekLabel || '', fairnessRows: snap.fairnessRows || [] };
         renderFairnessTable(snap.fairnessRows || []);
         enableScheduleEditing();
+        attachHeaderNameHandlers();
       } catch(e){ /* ignore a corrupted snapshot rather than breaking page load */ }
     }
 
@@ -917,6 +922,97 @@
       }
     }
 
+    /* ===== Read-only "all of this person's tasks this week" lookup =====
+       Double-click a person's name in either schedule's header row. Purely a viewer — it
+       doesn't lock or change anything, so everything (including that person) can still be
+       regenerated afterward. */
+    function openPersonTasksModal(personName, kind, table){
+      closeModal();
+      lastFocusedElement = document.activeElement;
+
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      backdrop.tabIndex = -1;
+
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.setAttribute('role','dialog');
+      modal.setAttribute('aria-modal','true');
+      const label = kind === 'kitchen' ? 'Kitchen Tasks' : 'Work Duties';
+      modal.setAttribute('aria-label', `${personName} — ${label} this week`);
+
+      const header = document.createElement('div');
+      header.style.fontWeight = '600'; header.style.marginBottom = '8px';
+      header.textContent = `${personName} — ${label} This Week`;
+      modal.appendChild(header);
+
+      const items = [];
+      if(kind === 'kitchen'){
+        days.forEach(day=>{
+          kitchenSubTasks.forEach(sub=>{
+            const cell = Array.from(table.querySelectorAll(`td[data-day="${day}"][data-sub="${sub}"]`)).find(c => c.dataset.personName === personName);
+            if(cell && cell.textContent && cell.textContent.includes('✓')) items.push(`${day}: ${sub}`);
+          });
+        });
+      } else {
+        days.forEach(day=>{
+          const cell = Array.from(table.querySelectorAll(`td[data-day="${day}"]`)).find(c => c.dataset.personName === personName);
+          if(cell && cell.textContent && cell.textContent.trim() !== ''){
+            cell.textContent.split(',').map(s=>s.trim()).filter(Boolean).forEach(taskName => items.push(`${day}: ${taskName}`));
+          }
+        });
+      }
+
+      const body = document.createElement('div');
+      if(items.length){
+        const ul = document.createElement('ul');
+        ul.style.margin = '0'; ul.style.paddingLeft = '18px';
+        items.forEach(t=>{ const li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
+        body.appendChild(ul);
+      } else {
+        body.textContent = `No ${label.toLowerCase()} assigned this week.`;
+        body.style.color = 'var(--muted)';
+      }
+      modal.appendChild(body);
+
+      const btnRow = document.createElement('div');
+      btnRow.style.display = 'flex'; btnRow.style.justifyContent = 'flex-end'; btnRow.style.marginTop = '12px';
+      const closeBtn = document.createElement('button');
+      closeBtn.type = 'button'; closeBtn.textContent = 'Close';
+      closeBtn.addEventListener('click', closeModal);
+      btnRow.appendChild(closeBtn);
+      modal.appendChild(btnRow);
+
+      backdrop.appendChild(modal);
+      modalContainer.appendChild(backdrop);
+      modalContainer.setAttribute('aria-hidden','false');
+      activeModal = backdrop;
+
+      setTimeout(()=> closeBtn.focus(), 20);
+      backdrop.addEventListener('click', (ev)=>{ if(ev.target === backdrop) closeModal(); });
+      function onKey(ev){ if(ev.key === 'Escape') closeModal(); }
+      document.addEventListener('keydown', onKey);
+      backdrop._cleanup = ()=>{ document.removeEventListener('keydown', onKey); };
+    }
+
+    // Wires up double-click-to-view on the person-name header cells of both schedule tables.
+    // Needs to be re-run any time a table's innerHTML is replaced wholesale (fresh generate,
+    // loading a saved week, restoring a snapshot), since that wipes out any listeners.
+    function attachHeaderNameHandlers(){
+      [[kitchenScheduleTable,'kitchen',2],[workScheduleTable,'work',1]].forEach(([table, kind, skip])=>{
+        if(!table.tHead || !table.tHead.rows.length) return;
+        const headRow = table.tHead.rows[0];
+        for(let i = skip; i < headRow.cells.length; i++){
+          const cell = headRow.cells[i];
+          if(cell.dataset.nameHandlerBound) continue;
+          cell.dataset.nameHandlerBound = '1';
+          cell.style.cursor = 'pointer';
+          cell.title = `Double-click to see all of ${cell.textContent}'s ${kind === 'kitchen' ? 'kitchen tasks' : 'work duties'} this week`;
+          cell.addEventListener('dblclick', ()=> openPersonTasksModal(cell.textContent, kind, table));
+        }
+      });
+    }
+
     /* ===== Event wiring (adders) ===== */
     function addOnePerson(nameRaw, gender, role, opts){
       opts = opts || {};
@@ -1285,22 +1381,24 @@
       lastScheduleMeta = { weekLabel, fairnessRows };
 
       enableScheduleEditing();
+      attachHeaderNameHandlers();
       saveScheduleSnapshot();
     }
 
     /* ===== Regenerate just one day, keeping the rest of the week untouched ===== */
-    function regenerateSingleDay(day){
+    function regenerateScope(dayList, opts){
+      const doKitchen = !!opts.kitchen;
+      const doWork = !!opts.work;
       if(!kitchenScheduleTable.rows.length){ alert('Generate a full schedule first.'); return; }
-      if(!confirm(`Regenerate just ${day}? This overwrites ${day}'s assignments only — the rest of the week stays as-is.`)) return;
 
       const totalAssignments = Object.fromEntries(peopleList.map(p=>[p.name,0]));
       const kitchenCountByPerson = Object.fromEntries(peopleList.map(p=>[p.name,0]));
       const kitchenTaskCounts = Object.fromEntries(peopleList.map(p=>[p.name, Object.fromEntries(kitchenSubTasks.map(s=>[s,0]))]));
 
-      // Recompute current load from the DOM, excluding the day we're about to overwrite,
-      // so the regenerated day stays fair relative to the rest of the week.
+      // Recompute current load from the DOM, excluding only the (day, type) combos we're
+      // about to overwrite, so the regenerated portion stays fair relative to everything else.
       Array.from(kitchenScheduleTable.querySelectorAll('td[data-day]')).forEach(cell=>{
-        if(cell.dataset.day === day) return;
+        if(doKitchen && dayList.includes(cell.dataset.day)) return;
         const person = peopleList.find(pp=>pp.name===cell.dataset.personName);
         if(person && cell.textContent && cell.textContent.includes('✓')){
           totalAssignments[person.name]++; kitchenCountByPerson[person.name]++;
@@ -1308,7 +1406,7 @@
         }
       });
       Array.from(workScheduleTable.querySelectorAll('td[data-day]')).forEach(cell=>{
-        if(cell.dataset.day === day) return;
+        if(doWork && dayList.includes(cell.dataset.day)) return;
         const person = peopleList.find(pp=>pp.name===cell.dataset.personName);
         if(person && cell.textContent && cell.textContent.trim() !== ''){
           const n = cell.textContent.split(',').map(s=>s.trim()).filter(Boolean).length;
@@ -1342,7 +1440,8 @@
         return shuffled;
       }
 
-      // Same "keep the same person on the same work duty" pre-pass as the full generator
+      // Same "keep the same person on the same work duty" pre-pass as the full generator —
+      // computed regardless of scope, since kitchen's Lunch-Dishes reservation depends on it too.
       const projectedLoad = Object.fromEntries(peopleList.map(p=>[p.name,0]));
       const workPrimaryAssignees = {};
       workTasks.forEach((task, tIdx)=>{
@@ -1353,123 +1452,147 @@
         workPrimaryAssignees[tIdx] = chosen.map(p=>p.name);
         chosen.forEach(p=> projectedLoad[p.name]+=activeDayCount);
       });
-      const workPrimariesToday = new Set();
-      workTasks.forEach((task,tIdx)=>{ if(task.days && task.days[day]) (workPrimaryAssignees[tIdx]||[]).forEach(n=>workPrimariesToday.add(n)); });
+      const workPrimariesByDay = Object.fromEntries(days.map(d=>[d, new Set()]));
+      workTasks.forEach((task, tIdx)=>{
+        days.forEach(d=>{ if(task.days && task.days[d]) (workPrimaryAssignees[tIdx]||[]).forEach(n=>workPrimariesByDay[d].add(n)); });
+      });
 
-      const dailyAssignedKitchen = new Set();
-      const dailyAssignedWork = new Set();
-
-      function getKitchenCell(sub, personName){
+      function getKitchenCell(day, sub, personName){
         return Array.from(kitchenScheduleTable.querySelectorAll(`td[data-day="${day}"]`)).find(c => c.dataset.sub === sub && c.dataset.personName === personName);
       }
-      function getWorkCell(personName){
+      function getWorkCell(day, personName){
         return Array.from(workScheduleTable.querySelectorAll(`td[data-day="${day}"]`)).find(c => c.dataset.personName === personName);
       }
-      function personHasLunchDishesToday(name){
-        const cell = getKitchenCell('Lunch Dishes', name);
+      function personHasLunchDishesToday(day, name){
+        const cell = getKitchenCell(day, 'Lunch Dishes', name);
         return !!(cell && cell.textContent && cell.textContent.includes('✓'));
       }
 
-      // clear this day's cells before reassigning
-      Array.from(kitchenScheduleTable.querySelectorAll(`td[data-day="${day}"]`)).forEach(c=>{ c.textContent=''; c.className='editable-cell'; delete c.dataset.lockedTask; });
-      Array.from(workScheduleTable.querySelectorAll(`td[data-day="${day}"]`)).forEach(c=>{ c.textContent=''; c.className='editable-cell'; delete c.dataset.lockedTask; });
+      // clear the cells we're about to reassign
+      if(doKitchen) dayList.forEach(day=> Array.from(kitchenScheduleTable.querySelectorAll(`td[data-day="${day}"]`)).forEach(c=>{ c.textContent=''; c.className='editable-cell'; delete c.dataset.lockedTask; }));
+      if(doWork) dayList.forEach(day=> Array.from(workScheduleTable.querySelectorAll(`td[data-day="${day}"]`)).forEach(c=>{ c.textContent=''; c.className='editable-cell'; delete c.dataset.lockedTask; }));
 
-      const dayWarnings = [];
+      const scopeWarnings = [];
 
-      kitchenSubTasks.forEach(sub=>{
-        const matching = kitchenTasks.filter(t=>t.name===sub && t.days && t.days[day]);
-        if(matching.length===0) return;
-        const studentsAllowed = !studentRestrictedSubTasks.includes(sub);
-        const reservedForWork = (p)=> sub==='Lunch Dishes' && workPrimariesToday.has(p.name);
-        const lockKey = `kitchen|${day}|${sub}`;
-        matching.forEach(task=>{
-          for(let s=0;s<task.count;s++){
-            let chosen = null;
-            if(s===0 && lockedAssignments[lockKey]){
-              const lp = peopleList.find(p=>p.name===lockedAssignments[lockKey]);
-              const okAvail = lp && availability[lp.name] && availability[lp.name][day] && availability[lp.name][day][sub];
-              if(lp && okAvail && !dailyAssignedKitchen.has(lp.name)) chosen = lp;
-            }
-            if(!chosen){
-              let eligible = peopleList.filter(p=>{
-                if(!studentsAllowed && isStudent(p)) return false;
-                if(reservedForWork(p)) return false;
-                const personAvail = availability[p.name] && availability[p.name][day];
-                if(!personAvail || !personAvail[sub]) return false;
-                if(dailyAssignedKitchen.has(p.name)) return false;
-                return true;
-              });
-              if(eligible.length===0) eligible = peopleList.filter(p=>(studentsAllowed||!isStudent(p)) && !reservedForWork(p) && availability[p.name] && availability[p.name][day] && availability[p.name][day][sub] && !dailyAssignedKitchen.has(p.name));
-              if(eligible.length===0) eligible = peopleList.filter(p=>(studentsAllowed||!isStudent(p)) && !reservedForWork(p) && !dailyAssignedKitchen.has(p.name));
-              if(eligible.length===0) eligible = peopleList.filter(p=> studentsAllowed || !isStudent(p));
-              if(eligible.length===0) eligible = peopleList.slice();
-              const sorted = sortCandidatesByFairness(eligible, sub);
-              chosen = sorted.length ? sorted[0] : null;
-            }
-            if(!chosen) continue;
+      dayList.forEach(day=>{
+        const dailyAssignedKitchen = new Set();
+        const dailyAssignedWork = new Set();
 
-            if(dailyAssignedKitchen.has(chosen.name)){
-              dayWarnings.push(`${day}: ${chosen.name} had to be double-booked for ${sub} — not enough other people were available.`);
-            }
-            totalAssignments[chosen.name]+=1; kitchenCountByPerson[chosen.name]+=1;
-            dailyAssignedKitchen.add(chosen.name); kitchenTaskCounts[chosen.name][sub]+=1;
+        if(doKitchen){
+          kitchenSubTasks.forEach(sub=>{
+            const matching = kitchenTasks.filter(t=>t.name===sub && t.days && t.days[day]);
+            if(matching.length===0) return;
+            const studentsAllowed = !studentRestrictedSubTasks.includes(sub);
+            const reservedForWork = (p)=> sub==='Lunch Dishes' && workPrimariesByDay[day].has(p.name);
+            const lockKey = `kitchen|${day}|${sub}`;
+            matching.forEach(task=>{
+              for(let s=0;s<task.count;s++){
+                let chosen = null;
+                if(s===0 && lockedAssignments[lockKey]){
+                  const lp = peopleList.find(p=>p.name===lockedAssignments[lockKey]);
+                  const okAvail = lp && availability[lp.name] && availability[lp.name][day] && availability[lp.name][day][sub];
+                  if(lp && okAvail && !dailyAssignedKitchen.has(lp.name)) chosen = lp;
+                }
+                if(!chosen){
+                  let eligible = peopleList.filter(p=>{
+                    if(!studentsAllowed && isStudent(p)) return false;
+                    if(reservedForWork(p)) return false;
+                    const personAvail = availability[p.name] && availability[p.name][day];
+                    if(!personAvail || !personAvail[sub]) return false;
+                    if(dailyAssignedKitchen.has(p.name)) return false;
+                    return true;
+                  });
+                  if(eligible.length===0) eligible = peopleList.filter(p=>(studentsAllowed||!isStudent(p)) && !reservedForWork(p) && availability[p.name] && availability[p.name][day] && availability[p.name][day][sub] && !dailyAssignedKitchen.has(p.name));
+                  if(eligible.length===0) eligible = peopleList.filter(p=>(studentsAllowed||!isStudent(p)) && !reservedForWork(p) && !dailyAssignedKitchen.has(p.name));
+                  if(eligible.length===0) eligible = peopleList.filter(p=> studentsAllowed || !isStudent(p));
+                  if(eligible.length===0) eligible = peopleList.slice();
+                  const sorted = sortCandidatesByFairness(eligible, sub);
+                  chosen = sorted.length ? sorted[0] : null;
+                }
+                if(!chosen) continue;
 
-            const cell = getKitchenCell(sub, chosen.name);
-            if(cell){
-              cell.textContent = (cell.textContent? cell.textContent+', ':'')+'✓';
-              cell.className = 'kitchen-task editable-cell';
-              if(lockedAssignments[lockKey] === chosen.name) cell.classList.add('locked-cell');
+                if(dailyAssignedKitchen.has(chosen.name)){
+                  scopeWarnings.push(`${day}: ${chosen.name} had to be double-booked for ${sub} — not enough other people were available.`);
+                }
+                totalAssignments[chosen.name]+=1; kitchenCountByPerson[chosen.name]+=1;
+                dailyAssignedKitchen.add(chosen.name); kitchenTaskCounts[chosen.name][sub]+=1;
+
+                const cell = getKitchenCell(day, sub, chosen.name);
+                if(cell){
+                  cell.textContent = (cell.textContent? cell.textContent+', ':'')+'✓';
+                  cell.className = 'kitchen-task editable-cell';
+                  if(lockedAssignments[lockKey] === chosen.name) cell.classList.add('locked-cell');
+                }
+              }
+            });
+          });
+        }
+
+        if(doWork){
+          workTasks.forEach((task, tIdx)=>{
+            if(!task.days || !task.days[day]) return;
+            function isAvailableToday(p){
+              const personAvail = availability[p.name] && availability[p.name][day];
+              if(!personAvail || !personAvail['Work Duty']) return false;
+              if(task.genderRequired && task.genderRequired!=='Any' && p.gender!==task.genderRequired) return false;
+              if(dailyAssignedWork.has(p.name)) return false;
+              if(personHasLunchDishesToday(day, p.name)) return false;
+              return true;
             }
-          }
-        });
+            const workLockKey = `work|${day}|${task.name}`;
+            const chosenNames = [];
+            const lockedName = lockedAssignments[workLockKey];
+            if(lockedName){
+              const lp = peopleList.find(p=>p.name===lockedName);
+              if(lp && isAvailableToday(lp)) chosenNames.push(lockedName);
+            }
+            (workPrimaryAssignees[tIdx]||[]).forEach(name=>{
+              if(chosenNames.length>=task.count || chosenNames.includes(name)) return;
+              const person = peopleList.find(p=>p.name===name);
+              if(person && isAvailableToday(person)) chosenNames.push(name);
+            });
+            if(chosenNames.length < task.count){
+              const fallbackPool = peopleList.filter(p=> !chosenNames.includes(p.name) && isAvailableToday(p));
+              const sortedFallback = sortCandidatesByFairness(fallbackPool);
+              for(const cand of sortedFallback){ if(chosenNames.length>=task.count) break; chosenNames.push(cand.name); }
+            }
+            if(chosenNames.length < task.count){
+              scopeWarnings.push(`${day}: ${task.name} needs ${task.count} but only ${chosenNames.length} could be assigned.`);
+            }
+            chosenNames.forEach(name=>{
+              totalAssignments[name] += 1;
+              dailyAssignedWork.add(name);
+              const cell = getWorkCell(day, name);
+              if(cell){
+                cell.textContent = (cell.textContent?cell.textContent+', ':'')+task.name;
+                cell.className = 'work-task editable-cell';
+                if(lockedName === name){ cell.classList.add('locked-cell'); cell.dataset.lockedTask = task.name; }
+              }
+            });
+          });
+        }
       });
 
-      workTasks.forEach((task, tIdx)=>{
-        if(!task.days || !task.days[day]) return;
-        function isAvailableToday(p){
-          const personAvail = availability[p.name] && availability[p.name][day];
-          if(!personAvail || !personAvail['Work Duty']) return false;
-          if(task.genderRequired && task.genderRequired!=='Any' && p.gender!==task.genderRequired) return false;
-          if(dailyAssignedWork.has(p.name)) return false;
-          if(personHasLunchDishesToday(p.name)) return false;
-          return true;
-        }
-        const workLockKey = `work|${day}|${task.name}`;
-        const chosenNames = [];
-        const lockedName = lockedAssignments[workLockKey];
-        if(lockedName){
-          const lp = peopleList.find(p=>p.name===lockedName);
-          if(lp && isAvailableToday(lp)) chosenNames.push(lockedName);
-        }
-        (workPrimaryAssignees[tIdx]||[]).forEach(name=>{
-          if(chosenNames.length>=task.count || chosenNames.includes(name)) return;
-          const person = peopleList.find(p=>p.name===name);
-          if(person && isAvailableToday(person)) chosenNames.push(name);
-        });
-        if(chosenNames.length < task.count){
-          const fallbackPool = peopleList.filter(p=> !chosenNames.includes(p.name) && isAvailableToday(p));
-          const sortedFallback = sortCandidatesByFairness(fallbackPool);
-          for(const cand of sortedFallback){ if(chosenNames.length>=task.count) break; chosenNames.push(cand.name); }
-        }
-        if(chosenNames.length < task.count){
-          dayWarnings.push(`${day}: ${task.name} needs ${task.count} but only ${chosenNames.length} could be assigned.`);
-        }
-        chosenNames.forEach(name=>{
-          const cell = getWorkCell(name);
-          if(cell){
-            cell.textContent = (cell.textContent?cell.textContent+', ':'')+task.name;
-            cell.className = 'work-task editable-cell';
-            if(lockedName === name){ cell.classList.add('locked-cell'); cell.dataset.lockedTask = task.name; }
-          }
-        });
-      });
-
-      swapHistory = []; // undo history for this day no longer applies to the freshly-regenerated cells
+      swapHistory = []; // undo history for the regenerated portion no longer applies
       recomputeFairnessAfterEdit();
-      showScheduleWarnings(dayWarnings);
+      showScheduleWarnings(scopeWarnings);
       saveScheduleSnapshot();
     }
+
+    function regenerateSingleDay(day){
+      if(!confirm(`Regenerate just ${day}? This overwrites ${day}'s assignments only — the rest of the week stays as-is.`)) return;
+      regenerateScope([day], { kitchen:true, work:true });
+    }
     regenDayBtn.addEventListener('click', ()=> regenerateSingleDay(regenDaySelect.value));
+
+    regenKitchenOnlyBtn.addEventListener('click', ()=>{
+      if(!confirm('Regenerate ALL kitchen tasks for the whole week? Work Duty assignments stay exactly as they are.')) return;
+      regenerateScope(days.slice(), { kitchen:true, work:false });
+    });
+    regenWorkOnlyBtn.addEventListener('click', ()=>{
+      if(!confirm('Regenerate ALL Work Duty assignments for the whole week? Kitchen tasks stay exactly as they are.')) return;
+      regenerateScope(days.slice(), { kitchen:false, work:true });
+    });
 
     undoSwapBtn.addEventListener('click', ()=>{
       const last = swapHistory.pop();
@@ -1715,6 +1838,7 @@
       showScheduleWarnings([]);
       swapHistory = [];
       enableScheduleEditing();
+      attachHeaderNameHandlers();
       saveScheduleSnapshot();
     });
 
