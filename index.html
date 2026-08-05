@@ -175,7 +175,7 @@
 
   <section id="schedule-section">
     <h2 id="kitchen-schedule-h">Generated Kitchen Schedule</h2>
-    <p style="font-size:13px;color:var(--muted);margin:0 0 6px 0;">Tip: click or tap a cell, then click another cell in the same row to swap them — or drag one onto the other with a mouse. Double-click a cell to lock it (🔒) so it survives the next Generate. Double-click a person's name in the header row to see all of their tasks for the week.</p>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 6px 0;">Tip: click or tap a cell, then click another cell in the same row to swap them — or drag one onto the other with a mouse. Double-click an assigned cell in the grid to lock it (🔒) so it survives the next Generate. On a person's <strong>name</strong> in the header row: click to see all of their tasks for the week, double-click to lock or unlock all of them at once.</p>
     <div class="input-group" style="margin:0 0 8px 0;">
       <label for="regen-day-select" class="sr-only">Day to regenerate</label>
       <select id="regen-day-select" aria-label="Day to regenerate">
@@ -369,13 +369,16 @@
     }
 
     /* ===== Lock/unlock a single schedule cell so it survives the next Generate/Regenerate ===== */
-    function toggleCellLock(cellEl, kind){
+    function toggleCellLock(cellEl, kind, opts){
+      opts = opts || {};
       const day = cellEl.dataset.day;
       const personName = cellEl.dataset.personName;
       const text = cellEl.textContent.trim();
       const isLocked = cellEl.classList.contains('locked-cell');
+      const shouldLock = opts.forceState === undefined ? !isLocked : opts.forceState;
 
-      if(isLocked){
+      if(!shouldLock){
+        if(!isLocked) return;
         const key = kind === 'kitchen' ? `kitchen|${day}|${cellEl.dataset.sub}` : `work|${day}|${cellEl.dataset.lockedTask || ''}`;
         delete lockedAssignments[key];
         cellEl.classList.remove('locked-cell');
@@ -384,12 +387,13 @@
         return;
       }
 
-      if(!text){ alert('Only an assigned cell can be locked — there\'s nothing here to keep in place.'); return; }
+      if(isLocked) return;
+      if(!text){ if(!opts.silent) alert('Only an assigned cell can be locked — there\'s nothing here to keep in place.'); return; }
 
       if(kind === 'kitchen'){
         lockedAssignments[`kitchen|${day}|${cellEl.dataset.sub}`] = personName;
       } else {
-        if(text.includes(',')){ alert('This person has more than one Work Duty that day — locking isn\'t supported for combined cells yet.'); return; }
+        if(text.includes(',')){ if(!opts.silent) alert('This person has more than one Work Duty that day — locking isn\'t supported for combined cells yet.'); return; }
         lockedAssignments[`work|${day}|${text}`] = personName;
         cellEl.dataset.lockedTask = text;
       }
@@ -995,9 +999,52 @@
       backdrop._cleanup = ()=>{ document.removeEventListener('keydown', onKey); };
     }
 
-    // Wires up double-click-to-view on the person-name header cells of both schedule tables.
-    // Needs to be re-run any time a table's innerHTML is replaced wholesale (fresh generate,
-    // loading a saved week, restoring a snapshot), since that wipes out any listeners.
+    // Locks (or unlocks, if everything's already locked) every task a person currently has
+    // in one schedule table for the whole week, in one go.
+    function toggleAllPersonLocks(personName, kind, table){
+      const cells = [];
+      if(kind === 'kitchen'){
+        days.forEach(day=>{
+          kitchenSubTasks.forEach(sub=>{
+            const cell = Array.from(table.querySelectorAll(`td[data-day="${day}"][data-sub="${sub}"]`)).find(c=>c.dataset.personName===personName);
+            if(cell && cell.textContent && cell.textContent.trim() !== '') cells.push(cell);
+          });
+        });
+      } else {
+        days.forEach(day=>{
+          const cell = Array.from(table.querySelectorAll(`td[data-day="${day}"]`)).find(c=>c.dataset.personName===personName);
+          if(cell && cell.textContent && cell.textContent.trim() !== '') cells.push(cell);
+        });
+      }
+
+      if(!cells.length){
+        alert(`${personName} has no ${kind === 'kitchen' ? 'kitchen tasks' : 'work duties'} assigned this week to lock.`);
+        return;
+      }
+
+      const allLocked = cells.every(c => c.classList.contains('locked-cell'));
+      const targetState = !allLocked; // if everything's already locked, this unlocks; otherwise it locks
+
+      let skippedCombined = 0, affected = 0;
+      cells.forEach(c=>{
+        if(targetState && kind === 'work' && c.textContent.includes(',')){ skippedCombined++; return; }
+        const wasLocked = c.classList.contains('locked-cell');
+        toggleCellLock(c, kind, { forceState: targetState, silent: true });
+        if(c.classList.contains('locked-cell') !== wasLocked) affected++;
+      });
+
+      const verb = targetState ? 'Locked' : 'Unlocked';
+      const label = kind === 'kitchen' ? 'kitchen task(s)' : 'work duty day(s)';
+      let msg = `${verb} ${affected} of ${personName}'s ${label} for the week.`;
+      if(targetState && skippedCombined){
+        msg += ` (${skippedCombined} day(s) skipped — combined multi-task cells aren't lockable yet.)`;
+      }
+      alert(msg);
+    }
+
+    // Wires up the header name cells of both schedule tables. Click opens a read-only "all of
+    // this person's tasks" viewer; double-click locks/unlocks all of that person's tasks at once.
+    // Click is delayed briefly so a double-click doesn't also pop the viewer open first.
     function attachHeaderNameHandlers(){
       [[kitchenScheduleTable,'kitchen',2],[workScheduleTable,'work',1]].forEach(([table, kind, skip])=>{
         if(!table.tHead || !table.tHead.rows.length) return;
@@ -1007,8 +1054,19 @@
           if(cell.dataset.nameHandlerBound) continue;
           cell.dataset.nameHandlerBound = '1';
           cell.style.cursor = 'pointer';
-          cell.title = `Double-click to see all of ${cell.textContent}'s ${kind === 'kitchen' ? 'kitchen tasks' : 'work duties'} this week`;
-          cell.addEventListener('dblclick', ()=> openPersonTasksModal(cell.textContent, kind, table));
+          const label = kind === 'kitchen' ? 'kitchen tasks' : 'work duties';
+          cell.title = `Click to see all of ${cell.textContent}'s ${label} this week. Double-click to lock/unlock all of them at once.`;
+
+          let clickTimer = null;
+          cell.addEventListener('click', ()=>{
+            if(clickTimer) clearTimeout(clickTimer);
+            clickTimer = setTimeout(()=>{ openPersonTasksModal(cell.textContent, kind, table); clickTimer = null; }, 250);
+          });
+          cell.addEventListener('dblclick', (ev)=>{
+            ev.preventDefault();
+            if(clickTimer){ clearTimeout(clickTimer); clickTimer = null; }
+            toggleAllPersonLocks(cell.textContent, kind, table);
+          });
         }
       });
     }
