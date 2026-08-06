@@ -329,6 +329,13 @@
     weekLabelInput.addEventListener('keydown', (ev)=>{ if(ev.key === 'Enter'){ ev.preventDefault(); generateBtn.click(); } });
     function shuffle(arr){ const a = arr.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
     function isStudent(p){ return p && p.role === 'Student'; }
+    function workloadPercentOf(p){ return (p && typeof p.workloadPercent === 'number') ? p.workloadPercent : 100; }
+    // Never divide by zero, and keep a 0% person deprioritized-but-not-impossible rather than
+    // fully excluded (a last-resort fallback can still use them if truly nobody else is free).
+    function capacityFactorByName(name){
+      const p = peopleList.find(pp => pp.name === name);
+      return Math.max(0.05, workloadPercentOf(p) / 100);
+    }
 
     // Shows a list of scheduling gaps (e.g. an understaffed Work Duty, or someone double-booked
     // in the kitchen because nobody else was available). Empty list hides the banner.
@@ -350,18 +357,22 @@
         '<table style="width:100%;border-collapse:collapse;">' +
           '<thead><tr>' +
             '<th style="text-align:left;padding:4px 6px;">Person</th>' +
+            '<th style="padding:4px 6px;">Workload</th>' +
             '<th style="padding:4px 6px;">Kitchen</th>' +
             '<th style="padding:4px 6px;">Work</th>' +
             '<th style="padding:4px 6px;">Total</th>' +
           '</tr></thead><tbody>' +
-          fairnessRows.map(r =>
-            `<tr${r.total === 0 ? ' class="zero-row"' : ''}>` +
+          fairnessRows.map(r => {
+            const pct = (typeof r.workloadPercent === 'number') ? r.workloadPercent : 100;
+            const flagZero = r.total === 0 && pct > 0;
+            return `<tr${flagZero ? ' class="zero-row"' : ''}>` +
               `<td style="text-align:left;padding:3px 6px;">${escapeHtml(r.name)}</td>` +
+              `<td style="padding:3px 6px;color:var(--muted);">${pct}%</td>` +
               `<td style="padding:3px 6px;">${r.kitchen}</td>` +
               `<td style="padding:3px 6px;">${r.work}</td>` +
-              `<td style="padding:3px 6px;font-weight:600;">${r.total}${r.total === 0 ? ' ⚠️' : ''}</td>` +
-            `</tr>`
-          ).join('') +
+              `<td style="padding:3px 6px;font-weight:600;">${r.total}${flagZero ? ' ⚠️' : ''}</td>` +
+            `</tr>`;
+          }).join('') +
           '</tbody></table>';
       fairnessSummaryBox.style.display = 'block';
       fairnessContent.setAttribute('aria-hidden','false');
@@ -386,7 +397,7 @@
       });
 
       const fairnessRows = peopleList
-        .map(p => ({ name: p.name, kitchen: kitchenCount[p.name]||0, work: workCount[p.name]||0, total: (kitchenCount[p.name]||0) + (workCount[p.name]||0) }))
+        .map(p => ({ name: p.name, kitchen: kitchenCount[p.name]||0, work: workCount[p.name]||0, total: (kitchenCount[p.name]||0) + (workCount[p.name]||0), workloadPercent: workloadPercentOf(p) }))
         .sort((a,b)=> b.total - a.total);
 
       renderFairnessTable(fairnessRows);
@@ -649,6 +660,38 @@
         btnGroup.appendChild(weekOnBtn);
         btnGroup.appendChild(removeBtn);
         div.appendChild(left); div.appendChild(btnGroup);
+
+        const workloadRow = document.createElement('div');
+        workloadRow.style.flexBasis = '100%';
+        workloadRow.style.display = 'flex';
+        workloadRow.style.alignItems = 'center';
+        workloadRow.style.gap = '8px';
+        workloadRow.style.marginTop = '2px';
+
+        const pct = workloadPercentOf(p);
+        const workloadLabel = document.createElement('span');
+        workloadLabel.style.fontSize = '12px';
+        workloadLabel.style.color = 'var(--muted)';
+        workloadLabel.style.minWidth = '108px';
+        workloadLabel.textContent = `Workload: ${pct}%`;
+
+        const workloadSlider = document.createElement('input');
+        workloadSlider.type = 'range';
+        workloadSlider.min = '0'; workloadSlider.max = '100'; workloadSlider.step = '5';
+        workloadSlider.value = String(pct);
+        workloadSlider.style.flex = '1';
+        workloadSlider.style.minWidth = '80px';
+        workloadSlider.setAttribute('aria-label', `${p.name}'s workload percentage`);
+        workloadSlider.title = "How much of a full workload to schedule this person for. Lower it if they have more going on than everyone else — the scheduler will assign them proportionally less.";
+        workloadSlider.addEventListener('input', ()=>{ workloadLabel.textContent = `Workload: ${workloadSlider.value}%`; });
+        workloadSlider.addEventListener('change', ()=>{
+          p.workloadPercent = parseInt(workloadSlider.value, 10);
+          saveData();
+        });
+
+        workloadRow.appendChild(workloadLabel);
+        workloadRow.appendChild(workloadSlider);
+        div.appendChild(workloadRow);
         peopleContainer.appendChild(div);
       });
     }
@@ -1103,7 +1146,7 @@
       const name = nameRaw.replace(/\s+/g,' ').trim();
       if(!name) return { ok:false, reason:'empty' };
       if(peopleList.find(p=>p.name.toLowerCase() === name.toLowerCase())) return { ok:false, reason:'duplicate', name };
-      peopleList.push({ name, gender, role });
+      peopleList.push({ name, gender, role, workloadPercent: 100 });
       availability[name] = availability[name] || {};
       days.forEach(d=> { availability[name][d] = availability[name][d] || {}; allSlots.forEach(s=>{ if(availability[name][d][s] === undefined) availability[name][d][s]=true; }); });
       if(!opts.skipSave) saveData();
@@ -1258,14 +1301,18 @@
       function sortCandidatesByFairness(candidates, kitchenSub){
         if(!candidates || candidates.length===0) return [];
         const shuffled = shuffle(candidates.slice());
-        const totals = Object.values(totalAssignments);
-        const avg = totals.reduce((a,b)=>a+b,0) / Math.max(1, totals.length);
-        const minLoad = Math.min(...totals);
-        const maxLoad = Math.max(...totals);
+        // Normalize each person's load by their workload %, so someone set to 60% is judged
+        // against their own fair share, not the raw group average.
+        const normalized = {};
+        peopleList.forEach(p => { normalized[p.name] = totalAssignments[p.name] / capacityFactorByName(p.name); });
+        const normValues = Object.values(normalized);
+        const avg = normValues.reduce((a,b)=>a+b,0) / Math.max(1, normValues.length);
+        const minLoad = Math.min(...normValues);
+        const maxLoad = Math.max(...normValues);
 
         shuffled.sort((a,b)=>{
-          let aScore = totalAssignments[a.name];
-          let bScore = totalAssignments[b.name];
+          let aScore = normalized[a.name];
+          let bScore = normalized[b.name];
 
           if(kitchenSub){
             // rotate: the more times someone already did THIS specific task, the less likely they get it again
@@ -1273,12 +1320,12 @@
             bScore += (kitchenTaskCounts[b.name][kitchenSub] || 0) * 1.5;
           }
 
-          if(totalAssignments[a.name] === minLoad) aScore -= 1.2;
-          if(totalAssignments[b.name] === minLoad) bScore -= 1.2;
-          if(totalAssignments[a.name] < avg) aScore -= 0.6;
-          if(totalAssignments[b.name] < avg) bScore -= 0.6;
-          if(totalAssignments[a.name] === maxLoad) aScore += 0.6;
-          if(totalAssignments[b.name] === maxLoad) bScore += 0.6;
+          if(normalized[a.name] === minLoad) aScore -= 1.2;
+          if(normalized[b.name] === minLoad) bScore -= 1.2;
+          if(normalized[a.name] < avg) aScore -= 0.6;
+          if(normalized[b.name] < avg) bScore -= 0.6;
+          if(normalized[a.name] === maxLoad) aScore += 0.6;
+          if(normalized[b.name] === maxLoad) bScore += 0.6;
 
           if(aScore !== bScore) return aScore - bScore;
           return Math.random() - 0.5;
@@ -1289,7 +1336,7 @@
 
       // ----- Decide persistent (primary) assignees per work task -----
       // Each work task keeps the same person(s) on it as much as it's needed, chosen fairly
-      // relative to everyone else's projected work-duty load.
+      // relative to everyone else's projected work-duty load (also workload-% aware).
       const projectedLoad = Object.fromEntries(peopleList.map(p=>[p.name,0]));
       const workPrimaryAssignees = {};
       const allPrimaryNames = new Set();
@@ -1300,7 +1347,7 @@
           if(task.genderRequired && task.genderRequired !== 'Any' && p.gender !== task.genderRequired) return false;
           return true;
         });
-        const sorted = shuffle(eligible.slice()).sort((a,b)=> projectedLoad[a.name] - projectedLoad[b.name]);
+        const sorted = shuffle(eligible.slice()).sort((a,b)=> (projectedLoad[a.name]/capacityFactorByName(a.name)) - (projectedLoad[b.name]/capacityFactorByName(b.name)));
         const chosen = sorted.slice(0, task.count);
         workPrimaryAssignees[tIdx] = chosen.map(p=>p.name);
         chosen.forEach(p=>{
@@ -1453,7 +1500,8 @@
           name: p.name,
           kitchen: kitchenCountByPerson[p.name] || 0,
           work: workCountByPerson[p.name] || 0,
-          total: totalAssignments[p.name] || 0
+          total: totalAssignments[p.name] || 0,
+          workloadPercent: workloadPercentOf(p)
         }))
         .sort((a,b)=> b.total - a.total);
 
@@ -1501,23 +1549,25 @@
       function sortCandidatesByFairness(candidates, kitchenSub){
         if(!candidates || candidates.length===0) return [];
         const shuffled = shuffle(candidates.slice());
-        const totals = Object.values(totalAssignments);
-        const avg = totals.reduce((a,b)=>a+b,0) / Math.max(1, totals.length);
-        const minLoad = Math.min(...totals);
-        const maxLoad = Math.max(...totals);
+        const normalized = {};
+        peopleList.forEach(p => { normalized[p.name] = totalAssignments[p.name] / capacityFactorByName(p.name); });
+        const normValues = Object.values(normalized);
+        const avg = normValues.reduce((a,b)=>a+b,0) / Math.max(1, normValues.length);
+        const minLoad = Math.min(...normValues);
+        const maxLoad = Math.max(...normValues);
         shuffled.sort((a,b)=>{
-          let aScore = totalAssignments[a.name];
-          let bScore = totalAssignments[b.name];
+          let aScore = normalized[a.name];
+          let bScore = normalized[b.name];
           if(kitchenSub){
             aScore += (kitchenTaskCounts[a.name][kitchenSub] || 0) * 1.5;
             bScore += (kitchenTaskCounts[b.name][kitchenSub] || 0) * 1.5;
           }
-          if(totalAssignments[a.name] === minLoad) aScore -= 1.2;
-          if(totalAssignments[b.name] === minLoad) bScore -= 1.2;
-          if(totalAssignments[a.name] < avg) aScore -= 0.6;
-          if(totalAssignments[b.name] < avg) bScore -= 0.6;
-          if(totalAssignments[a.name] === maxLoad) aScore += 0.6;
-          if(totalAssignments[b.name] === maxLoad) bScore += 0.6;
+          if(normalized[a.name] === minLoad) aScore -= 1.2;
+          if(normalized[b.name] === minLoad) bScore -= 1.2;
+          if(normalized[a.name] < avg) aScore -= 0.6;
+          if(normalized[b.name] < avg) bScore -= 0.6;
+          if(normalized[a.name] === maxLoad) aScore += 0.6;
+          if(normalized[b.name] === maxLoad) bScore += 0.6;
           if(aScore !== bScore) return aScore - bScore;
           return Math.random() - 0.5;
         });
@@ -1531,7 +1581,7 @@
       workTasks.forEach((task, tIdx)=>{
         const activeDayCount = days.filter(d => task.days && task.days[d]).length;
         const eligible = peopleList.filter(p => !task.genderRequired || task.genderRequired==='Any' || p.gender===task.genderRequired);
-        const sorted = shuffle(eligible.slice()).sort((a,b)=> projectedLoad[a.name]-projectedLoad[b.name]);
+        const sorted = shuffle(eligible.slice()).sort((a,b)=> (projectedLoad[a.name]/capacityFactorByName(a.name)) - (projectedLoad[b.name]/capacityFactorByName(b.name)));
         const chosen = sorted.slice(0, task.count);
         workPrimaryAssignees[tIdx] = chosen.map(p=>p.name);
         chosen.forEach(p=> projectedLoad[p.name]+=activeDayCount);
@@ -1726,8 +1776,8 @@
       const workCSV = tableToCSV(workScheduleTable);
       const fairnessRows = (lastScheduleMeta && lastScheduleMeta.fairnessRows) || [];
       const fairnessCSV = [
-        '"Person","Kitchen","Work","Total"',
-        ...fairnessRows.map(r => `"${r.name.replace(/"/g,'""')}",${r.kitchen},${r.work},${r.total}`)
+        '"Person","Workload %","Kitchen","Work","Total"',
+        ...fairnessRows.map(r => `"${r.name.replace(/"/g,'""')}",${(typeof r.workloadPercent==='number'?r.workloadPercent:100)},${r.kitchen},${r.work},${r.total}`)
       ].join('\n');
       const weekLabel = (lastScheduleMeta && lastScheduleMeta.weekLabel) || '';
 
@@ -1853,8 +1903,8 @@
         doc.setFontSize(13);
         doc.text('Fairness Summary (assignments per person)', margin, y);
         doc.autoTable({
-          head: [['Person','Kitchen','Work','Total']],
-          body: fairnessRows.map(r => [r.name, String(r.kitchen), String(r.work), String(r.total)]),
+          head: [['Person','Workload %','Kitchen','Work','Total']],
+          body: fairnessRows.map(r => [r.name, `${typeof r.workloadPercent==='number'?r.workloadPercent:100}%`, String(r.kitchen), String(r.work), String(r.total)]),
           startY: y + 8,
           margin: { left: margin, right: margin },
           styles: { fontSize: 9, halign: 'center', cellPadding: 4 },
