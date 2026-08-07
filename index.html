@@ -4,6 +4,32 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Weekly Work Scheduler</title>
+  <script>
+    // Diagnostic: catches any JS error the instant it happens and shows it directly on the
+    // page (no dev tools needed) — placed first, before anything else, so it can catch even
+    // an error that happens while the rest of the page is still loading.
+    (function(){
+      function showFatalError(text){
+        try{
+          var el = document.getElementById('fatal-error-banner');
+          if(!el){
+            el = document.createElement('div');
+            el.id = 'fatal-error-banner';
+            el.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#b00020;color:#fff;padding:10px 12px;font-size:13px;font-family:monospace;z-index:999999;white-space:pre-wrap;word-break:break-word;max-height:50vh;overflow:auto;';
+            (document.body || document.documentElement).appendChild(el);
+          }
+          el.textContent += (el.textContent ? '\n\n' : '') + text;
+        }catch(e){ /* if even this fails, there's nothing more we can do */ }
+      }
+      window.addEventListener('error', function(e){
+        showFatalError('JS ERROR: ' + e.message + '\nAt: ' + (e.filename||'') + ':' + e.lineno + ':' + e.colno);
+      });
+      window.addEventListener('unhandledrejection', function(e){
+        var reason = e.reason && e.reason.message ? e.reason.message : String(e.reason);
+        showFatalError('UNHANDLED PROMISE REJECTION: ' + reason);
+      });
+    })();
+  </script>
   <style>
     :root{
       --bg:#f4f4f4; --card:#fff; --text:#222; --muted:#666; --accent:#007BFF;
