@@ -129,8 +129,8 @@
     .modal{ background:var(--card); color:var(--text); border-radius:8px; padding:12px; max-width:420px; width:100%; box-shadow:0 10px 40px rgba(0,0,0,0.25); }
     .sr-only{ position:absolute !important; left:-10000px; top:auto; width:1px; height:1px; overflow:hidden; }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
 </head>
 <body>
   <h1>Weekly Work Scheduler</h1>
@@ -479,12 +479,12 @@
       }
 
       if(isLocked) return;
-      if(!text){ if(!opts.silent) alert('Only an assigned cell can be locked — there\'s nothing here to keep in place.'); return; }
+      if(!text){ if(!opts.silent) customAlert('Only an assigned cell can be locked — there\'s nothing here to keep in place.'); return; }
 
       if(kind === 'kitchen'){
         lockedAssignments[`kitchen|${day}|${cellEl.dataset.sub}`] = personName;
       } else {
-        if(text.includes(',')){ if(!opts.silent) alert('This person has more than one Work Duty that day — locking isn\'t supported for combined cells yet.'); return; }
+        if(text.includes(',')){ if(!opts.silent) customAlert('This person has more than one Work Duty that day — locking isn\'t supported for combined cells yet.'); return; }
         lockedAssignments[`work|${day}|${text}`] = personName;
         cellEl.dataset.lockedTask = text;
       }
@@ -524,14 +524,14 @@
         return ok ? null : `${person.name} marked themselves unavailable for Work Duty on ${day}.`;
       }
 
-      function completeSwap(a, b){
+      async function completeSwap(a, b){
         if(a.cellEl === b.cellEl) return;
         if(a.row !== b.row){
-          alert('You can only swap assignments within the same row (same day, and same task for kitchen).');
+          customAlert('You can only swap assignments within the same row (same day, and same task for kitchen).');
           return;
         }
         if(a.cellEl.classList.contains('locked-cell') || b.cellEl.classList.contains('locked-cell')){
-          alert('One of these cells is locked. Double-click it to unlock before swapping.');
+          customAlert('One of these cells is locked. Double-click it to unlock before swapping.');
           return;
         }
         if(a.personName === b.personName) return;
@@ -539,7 +539,7 @@
         const aNewText = b.cellEl.textContent;
         const bNewText = a.cellEl.textContent;
         const warnings = [warnIfUnavailable(a, aNewText), warnIfUnavailable(b, bNewText)].filter(Boolean);
-        if(warnings.length && !confirm(warnings.join('\n') + '\n\nSwap anyway?')) return;
+        if(warnings.length && !(await customConfirm(warnings.join('\n') + '\n\nSwap anyway?'))) return;
 
         swapHistory.push({
           cellA: a.cellEl, cellB: b.cellEl,
@@ -598,7 +598,7 @@
         cellEl.addEventListener('drop', (e)=>{
           e.preventDefault();
           if(!draggedCell) return;
-          if(cellEl.classList.contains('locked-cell')){ alert('This cell is locked. Double-click it to unlock before swapping.'); draggedCell = null; return; }
+          if(cellEl.classList.contains('locked-cell')){ customAlert('This cell is locked. Double-click it to unlock before swapping.'); draggedCell = null; return; }
           const targetInfo = cellInfo(cellEl, kind);
           const source = draggedCell;
           draggedCell = null;
@@ -687,23 +687,23 @@
         const weekOffBtn = document.createElement('button');
         weekOffBtn.type='button'; weekOffBtn.className='secondary'; weekOffBtn.textContent='Week Off';
         weekOffBtn.title = 'Mark unavailable for every slot, every day this week';
-        weekOffBtn.addEventListener('click', ()=>{
-          if(!confirm(`Mark ${p.name} unavailable for the ENTIRE week?`)) return;
+        weekOffBtn.addEventListener('click', async ()=>{
+          if(!(await customConfirm(`Mark ${p.name} unavailable for the ENTIRE week?`))) return;
           setWholeWeekAvailability(p.name, false);
         });
 
         const weekOnBtn = document.createElement('button');
         weekOnBtn.type='button'; weekOnBtn.className='secondary'; weekOnBtn.textContent='Week On';
         weekOnBtn.title = 'Mark available for every slot, every day this week';
-        weekOnBtn.addEventListener('click', ()=>{
-          if(!confirm(`Mark ${p.name} available for the ENTIRE week?`)) return;
+        weekOnBtn.addEventListener('click', async ()=>{
+          if(!(await customConfirm(`Mark ${p.name} available for the ENTIRE week?`))) return;
           setWholeWeekAvailability(p.name, true);
         });
 
         const removeBtn = document.createElement('button');
         removeBtn.type='button'; removeBtn.className='remove-btn'; removeBtn.textContent='Remove';
-        removeBtn.addEventListener('click', ()=>{
-          if(!confirm(`Remove ${p.name}?`)) return;
+        removeBtn.addEventListener('click', async ()=>{
+          if(!(await customConfirm(`Remove ${p.name}?`))) return;
           peopleList.splice(idx,1);
           saveData();
           ensureAvailabilityStructure();
@@ -790,20 +790,20 @@
       const cancelBtn = document.createElement('button');
       cancelBtn.type = 'button'; cancelBtn.className = 'secondary'; cancelBtn.textContent = 'Cancel';
 
-      saveBtn.addEventListener('click', ()=>{
+      saveBtn.addEventListener('click', async ()=>{
         const newName = nameInput.value.replace(/\s+/g,' ').trim();
-        if(!newName){ alert('Name required'); return; }
+        if(!newName){ customAlert('Name required'); return; }
         const nameChanged = newName.toLowerCase() !== p.name.toLowerCase();
         if(nameChanged && peopleList.some((pp,i)=> i!==idx && pp.name.toLowerCase()===newName.toLowerCase())){
-          alert('Another person already has that name'); return;
+          customAlert('Another person already has that name'); return;
         }
 
         if(nameChanged){
+          if(kitchenScheduleTable.rows.length && !(await customConfirm('Renaming clears the currently generated schedule (it referenced the old name). Continue?'))) return;
           // Move their availability data over to the new name, and invalidate any generated
           // schedule + locks that reference the old name, since it's no longer valid.
           availability[newName] = availability[p.name];
           delete availability[p.name];
-          if(kitchenScheduleTable.rows.length && !confirm('Renaming clears the currently generated schedule (it referenced the old name). Continue?')) return;
           kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessSummaryBox.style.display='none';
           scheduleWeekLabelEl.textContent=''; lastScheduleMeta = null; safeStorage.removeItem(STORAGE_KEYS.schedule);
           showScheduleWarnings([]); swapHistory = [];
@@ -903,11 +903,11 @@
       if(peopleList.some(p=>p.name===toPrev)) copyAvailTo.value = toPrev;
     }
 
-    copyAvailBtn.addEventListener('click', ()=>{
+    copyAvailBtn.addEventListener('click', async ()=>{
       const from = copyAvailFrom.value, to = copyAvailTo.value;
-      if(!from || !to){ alert('Add at least two people first.'); return; }
-      if(from === to){ alert('Pick two different people.'); return; }
-      if(!confirm(`Copy ${from}'s whole-week availability onto ${to}? This overwrites ${to}'s current availability.`)) return;
+      if(!from || !to){ customAlert('Add at least two people first.'); return; }
+      if(from === to){ customAlert('Pick two different people.'); return; }
+      if(!(await customConfirm(`Copy ${from}'s whole-week availability onto ${to}? This overwrites ${to}'s current availability.`))) return;
       availability[to] = JSON.parse(JSON.stringify(availability[from]));
       saveData();
       renderAvailability();
@@ -1050,6 +1050,96 @@
       }
     }
 
+    /* ===== Custom confirm/alert/prompt =====
+       Browsers let people (or the browser itself, after several dialogs in a row) permanently
+       block a page's native confirm()/alert()/prompt() popups — after that, confirm() just
+       silently returns false forever, which makes every button relying on it look "broken" with
+       no error at all. These build the same interaction out of our own modal markup instead,
+       which the browser has no mechanism to suppress. */
+    function openDialogModal({ title, message, kind, defaultValue }){
+      return new Promise((resolve)=>{
+        closeModal();
+        lastFocusedElement = document.activeElement;
+
+        const backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
+        backdrop.tabIndex = -1;
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.setAttribute('role','dialog');
+        modal.setAttribute('aria-modal','true');
+        if(title) modal.setAttribute('aria-label', title);
+
+        if(title){
+          const h = document.createElement('div');
+          h.style.fontWeight = '600'; h.style.marginBottom = '8px';
+          h.textContent = title;
+          modal.appendChild(h);
+        }
+
+        const msg = document.createElement('div');
+        msg.style.whiteSpace = 'pre-wrap';
+        msg.style.marginBottom = '10px';
+        msg.textContent = message || '';
+        modal.appendChild(msg);
+
+        let input = null;
+        if(kind === 'prompt'){
+          input = document.createElement('input');
+          input.type = 'text';
+          input.value = defaultValue || '';
+          input.style.width = '100%';
+          input.style.boxSizing = 'border-box';
+          input.style.marginBottom = '10px';
+          modal.appendChild(input);
+        }
+
+        const btnRow = document.createElement('div');
+        btnRow.style.display = 'flex'; btnRow.style.justifyContent = 'flex-end'; btnRow.style.gap = '8px';
+
+        let settled = false;
+        function finish(value){
+          if(settled) return;
+          settled = true;
+          closeModal();
+          resolve(value);
+        }
+
+        if(kind === 'alert'){
+          const okBtn = document.createElement('button');
+          okBtn.type = 'button'; okBtn.textContent = 'OK';
+          okBtn.addEventListener('click', ()=> finish(true));
+          btnRow.appendChild(okBtn);
+        } else {
+          const cancelBtn = document.createElement('button');
+          cancelBtn.type = 'button'; cancelBtn.className = 'secondary'; cancelBtn.textContent = 'Cancel';
+          cancelBtn.addEventListener('click', ()=> finish(kind === 'prompt' ? null : false));
+          const okBtn = document.createElement('button');
+          okBtn.type = 'button'; okBtn.textContent = 'OK';
+          okBtn.addEventListener('click', ()=> finish(kind === 'prompt' ? input.value : true));
+          btnRow.appendChild(cancelBtn);
+          btnRow.appendChild(okBtn);
+        }
+        modal.appendChild(btnRow);
+        backdrop.appendChild(modal);
+        modalContainer.appendChild(backdrop);
+        modalContainer.setAttribute('aria-hidden','false');
+        activeModal = backdrop;
+
+        setTimeout(()=>{ (input || (kind==='alert' ? btnRow.lastChild : btnRow.lastChild)).focus(); }, 20);
+        if(kind === 'prompt') input.addEventListener('keydown', (ev)=>{ if(ev.key === 'Enter'){ ev.preventDefault(); finish(input.value); } });
+
+        backdrop.addEventListener('click', (ev)=>{ if(ev.target === backdrop) finish(kind === 'alert' ? true : (kind === 'prompt' ? null : false)); });
+        function onKey(ev){ if(ev.key === 'Escape') finish(kind === 'alert' ? true : (kind === 'prompt' ? null : false)); }
+        document.addEventListener('keydown', onKey);
+        backdrop._cleanup = ()=>{ document.removeEventListener('keydown', onKey); };
+      });
+    }
+    function customConfirm(message, title){ return openDialogModal({ title: title || 'Please confirm', message, kind:'confirm' }); }
+    function customAlert(message, title){ return openDialogModal({ title: title || 'Notice', message, kind:'alert' }); }
+    function customPrompt(message, defaultValue, title){ return openDialogModal({ title: title || 'Please enter a value', message, kind:'prompt', defaultValue }); }
+
     /* ===== Read-only "all of this person's tasks this week" lookup =====
        Double-click a person's name in either schedule's header row. Purely a viewer — it
        doesn't lock or change anything, so everything (including that person) can still be
@@ -1142,7 +1232,7 @@
       }
 
       if(!cells.length){
-        alert(`${personName} has no ${kind === 'kitchen' ? 'kitchen tasks' : 'work duties'} assigned this week to lock.`);
+        customAlert(`${personName} has no ${kind === 'kitchen' ? 'kitchen tasks' : 'work duties'} assigned this week to lock.`);
         return;
       }
 
@@ -1163,7 +1253,7 @@
       if(targetState && skippedCombined){
         msg += ` (${skippedCombined} day(s) skipped — combined multi-task cells aren't lockable yet.)`;
       }
-      alert(msg);
+      customAlert(msg);
     }
 
     // Wires up the header name cells of both schedule tables. Click opens a read-only "all of
@@ -1212,7 +1302,7 @@
     addPersonBtn.addEventListener('click', ()=>{
       const result = addOnePerson(personInput.value, personGender.value, personRole.value);
       if(!result.ok){
-        alert(result.reason === 'empty' ? 'Name required' : 'Person already exists');
+        customAlert(result.reason === 'empty' ? 'Name required' : 'Person already exists');
         return;
       }
       renderPeople(); renderAvailability();
@@ -1225,7 +1315,7 @@
 
     bulkAddBtn.addEventListener('click', ()=>{
       const lines = bulkPeopleInput.value.split('\n').map(l=>l.replace(/\s+/g,' ').trim()).filter(Boolean);
-      if(!lines.length){ alert('Paste at least one name first.'); return; }
+      if(!lines.length){ customAlert('Paste at least one name first.'); return; }
       const gender = personGender.value, role = personRole.value;
       let added = 0; const skipped = [];
       lines.forEach(name=>{
@@ -1235,7 +1325,7 @@
       saveData();
       renderPeople(); renderAvailability();
       bulkPeopleInput.value = '';
-      alert(`Added ${added} ${added === 1 ? 'person' : 'people'}.` + (skipped.length ? ` Skipped ${skipped.length} already on the list: ${skipped.join(', ')}` : ''));
+      customAlert(`Added ${added} ${added === 1 ? 'person' : 'people'}.` + (skipped.length ? ` Skipped ${skipped.length} already on the list: ${skipped.join(', ')}` : ''));
     });
 
     sortNameBtn.addEventListener('click', ()=>{
@@ -1256,7 +1346,7 @@
       const name = workTaskInput.value.trim();
       const count = Math.max(1, parseInt(workTaskCount.value) || 1);
       const genderReq = workTaskGender.value;
-      if(!name) { alert('Task name required'); return; }
+      if(!name) { customAlert('Task name required'); return; }
       const task = { name, count, days: {} , genderRequired: genderReq};
       days.forEach(d=>task.days[d]=false);
       workTasks.push(task);
@@ -1281,7 +1371,7 @@
       kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessContent.innerHTML=''; fairnessSummaryBox.style.display='none'; scheduleWeekLabelEl.textContent='';
       ensureAvailabilityStructure();
       saveData();
-      if(peopleList.length === 0) { alert('Add people first.'); return; }
+      if(peopleList.length === 0) { customAlert('Add people first.'); return; }
       swapHistory = []; // any manual-swap undo history from before no longer applies to a fresh schedule
 
       const nameIndex = Object.fromEntries(peopleList.map((p, i) => [p.name, i]));
@@ -1577,7 +1667,7 @@
     function regenerateScope(dayList, opts){
       const doKitchen = !!opts.kitchen;
       const doWork = !!opts.work;
-      if(!kitchenScheduleTable.rows.length){ alert('Generate a full schedule first.'); return; }
+      if(!kitchenScheduleTable.rows.length){ customAlert('Generate a full schedule first.'); return; }
 
       const totalAssignments = Object.fromEntries(peopleList.map(p=>[p.name,0]));
       const kitchenCountByPerson = Object.fromEntries(peopleList.map(p=>[p.name,0]));
@@ -1769,24 +1859,24 @@
       saveScheduleSnapshot();
     }
 
-    function regenerateSingleDay(day){
-      if(!confirm(`Regenerate just ${day}? This overwrites ${day}'s assignments only — the rest of the week stays as-is.`)) return;
+    async function regenerateSingleDay(day){
+      if(!(await customConfirm(`Regenerate just ${day}? This overwrites ${day}'s assignments only — the rest of the week stays as-is.`))) return;
       regenerateScope([day], { kitchen:true, work:true });
     }
     regenDayBtn.addEventListener('click', ()=> regenerateSingleDay(regenDaySelect.value));
 
-    regenKitchenOnlyBtn.addEventListener('click', ()=>{
-      if(!confirm('Regenerate ALL kitchen tasks for the whole week? Work Duty assignments stay exactly as they are.')) return;
+    regenKitchenOnlyBtn.addEventListener('click', async ()=>{
+      if(!(await customConfirm('Regenerate ALL kitchen tasks for the whole week? Work Duty assignments stay exactly as they are.'))) return;
       regenerateScope(days.slice(), { kitchen:true, work:false });
     });
-    regenWorkOnlyBtn.addEventListener('click', ()=>{
-      if(!confirm('Regenerate ALL Work Duty assignments for the whole week? Kitchen tasks stay exactly as they are.')) return;
+    regenWorkOnlyBtn.addEventListener('click', async ()=>{
+      if(!(await customConfirm('Regenerate ALL Work Duty assignments for the whole week? Kitchen tasks stay exactly as they are.'))) return;
       regenerateScope(days.slice(), { kitchen:false, work:true });
     });
 
     undoSwapBtn.addEventListener('click', ()=>{
       const last = swapHistory.pop();
-      if(!last){ alert('Nothing to undo.'); return; }
+      if(!last){ customAlert('Nothing to undo.'); return; }
       last.cellA.textContent = last.aOldText; last.cellA.className = last.aOldClass;
       last.cellB.textContent = last.bOldText; last.cellB.className = last.bOldClass;
       recomputeFairnessAfterEdit();
@@ -1861,9 +1951,9 @@
 
     /* ===== PDF download — crisp vector text/tables (not a screenshot), colors preserved ===== */
     downloadPdfBtn.addEventListener('click', ()=>{
-      if(!kitchenScheduleTable.rows.length){ alert('Generate a schedule first.'); return; }
+      if(!kitchenScheduleTable.rows.length){ customAlert('Generate a schedule first.'); return; }
       if(typeof window.jspdf === 'undefined'){
-        alert('PDF export needs an internet connection to load (it uses a small external library).');
+        customAlert('PDF export needs an internet connection to load (it uses a small external library).');
         return;
       }
 
@@ -1993,10 +2083,10 @@
     }
     populateSavedWeeksSelect();
 
-    saveWeekBtn.addEventListener('click', ()=>{
-      if(!kitchenScheduleTable.rows.length){ alert('Generate a schedule first.'); return; }
+    saveWeekBtn.addEventListener('click', async ()=>{
+      if(!kitchenScheduleTable.rows.length){ customAlert('Generate a schedule first.'); return; }
       const defaultName = (lastScheduleMeta && lastScheduleMeta.weekLabel) || `Week ${savedWeeks.length + 1}`;
-      const name = prompt('Name this saved week:', defaultName);
+      const name = await customPrompt('Name this saved week:', defaultName);
       if(!name) return;
       savedWeeks.push({
         id: Date.now(),
@@ -2010,15 +2100,15 @@
       saveSavedWeeks();
       populateSavedWeeksSelect();
       savedWeeksSelect.value = String(savedWeeks[savedWeeks.length - 1].id);
-      alert(`Saved as "${name.trim()}".`);
+      customAlert(`Saved as "${name.trim()}".`);
     });
 
-    loadWeekBtn.addEventListener('click', ()=>{
+    loadWeekBtn.addEventListener('click', async ()=>{
       const id = savedWeeksSelect.value;
-      if(!id){ alert('Pick a saved week first.'); return; }
+      if(!id){ customAlert('Pick a saved week first.'); return; }
       const entry = savedWeeks.find(w => String(w.id) === id);
       if(!entry) return;
-      if(!confirm(`Load "${entry.name}"? This replaces the schedule currently shown (your saved weeks list is unaffected).`)) return;
+      if(!(await customConfirm(`Load "${entry.name}"? This replaces the schedule currently shown (your saved weeks list is unaffected).`))) return;
 
       kitchenScheduleTable.innerHTML = entry.kitchenHtml;
       workScheduleTable.innerHTML = entry.workHtml;
@@ -2032,21 +2122,21 @@
       saveScheduleSnapshot();
     });
 
-    deleteWeekBtn.addEventListener('click', ()=>{
+    deleteWeekBtn.addEventListener('click', async ()=>{
       const id = savedWeeksSelect.value;
-      if(!id){ alert('Pick a saved week first.'); return; }
+      if(!id){ customAlert('Pick a saved week first.'); return; }
       const entry = savedWeeks.find(w => String(w.id) === id);
       if(!entry) return;
-      if(!confirm(`Delete the saved week "${entry.name}"? This can't be undone.`)) return;
+      if(!(await customConfirm(`Delete the saved week "${entry.name}"? This can't be undone.`))) return;
       savedWeeks = savedWeeks.filter(w => String(w.id) !== id);
       saveSavedWeeks();
       populateSavedWeeksSelect();
     });
 
-    importFileInput.addEventListener('change', (ev)=>{
+    importFileInput.addEventListener('change', async (ev)=>{
       const f = ev.target.files[0];
       if(!f) return;
-      if(!confirm('Importing will replace current data. Continue?')) { ev.target.value=''; return; }
+      if(!(await customConfirm('Importing will replace current data. Continue?'))) { ev.target.value=''; return; }
       const reader = new FileReader();
       reader.onload = (e) => {
         try{
@@ -2059,9 +2149,9 @@
           saveData();
           ensureAvailabilityStructure();
           renderPeople(); renderTasks(kitchenTasks,kitchenTaskTable,false); renderTasks(workTasks,workTaskTable,true); renderAvailability();
-          alert('Import completed');
+          customAlert('Import completed');
         }catch(err){
-          alert('Invalid JSON file');
+          customAlert('Invalid JSON file');
         }
       };
       reader.readAsText(f);
@@ -2076,11 +2166,11 @@
     });
 
     /* ===== Reset ===== */
-    resetAllBtn.addEventListener('click', ()=>{
+    resetAllBtn.addEventListener('click', async ()=>{
       if(peopleList.length === 0 && kitchenTasks.length === 0 && workTasks.length === 0){
-        if(!confirm('Are you sure you want to reset ALL saved data?')) return;
+        if(!(await customConfirm('Are you sure you want to reset ALL saved data?'))) return;
       } else {
-        if(!confirm('This will permanently clear all people, tasks and availability.\n\nA backup JSON file of your current data will be downloaded automatically first, so you can re-import it later if needed.\n\nContinue?')) return;
+        if(!(await customConfirm('This will permanently clear all people, tasks and availability.\n\nA backup JSON file of your current data will be downloaded automatically first, so you can re-import it later if needed.\n\nContinue?'))) return;
         downloadJsonBackup('scheduler-backup-before-reset.json');
       }
       safeStorage.removeItem(STORAGE_KEYS.people); safeStorage.removeItem(STORAGE_KEYS.kitchen);
@@ -2097,7 +2187,7 @@
       populateSavedWeeksSelect();
       kitchenScheduleTable.innerHTML=''; workScheduleTable.innerHTML=''; fairnessSummaryBox.style.display='none'; scheduleWeekLabelEl.textContent=''; lastScheduleMeta = null;
       showScheduleWarnings([]);
-      alert('All data cleared. A backup of your previous data was downloaded before clearing.');
+      customAlert('All data cleared. A backup of your previous data was downloaded before clearing.');
     });
 
     /* ===== Initial render ===== */
